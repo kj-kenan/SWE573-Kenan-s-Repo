@@ -1,0 +1,102 @@
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #fffbee;
+    margin: 0;
+    padding: 0;
+    color: #333;
+}
+
+/* Navbar */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #ffcc33;
+    padding: 10px 40px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.navbar a {
+    text-decoration: none;
+    color: #333;
+    margin: 0 10px;
+    font-weight: bold;
+}
+
+.navbar a:hover {
+    color: #805500;
+}
+
+/* Hero */
+.hero {
+    text-align: center;
+    padding: 80px 20px;
+    background-color: #fff5cc;
+}
+
+.hero h1 {
+    font-size: 2.5em;
+    color: #444;
+}
+
+.cta {
+    margin-top: 20px;
+    padding: 12px 25px;
+    font-size: 1em;
+    background-color: #ffcc33;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+
+    display: inline-block;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.cta:hover {
+    background-color: #ffd966;
+    transform: scale(1.05);
+}
+
+/* Map */
+.map {
+    text-align: center;
+    padding: 50px;
+}
+
+#map-box {
+    width: 80%;
+    height: 300px;
+    background-color: #f7e89f;
+    margin: 0 auto;
+    border-radius: 10px;
+    line-height: 300px;
+    color: #666;
+    font-size: 1.2em;
+}
+
+/* Tags */
+.tags {
+    text-align: center;
+    padding: 30px;
+}
+
+.tag-list span {
+    display: inline-block;
+    background-color: #ffec99;
+    padding: 8px 15px;
+    border-radius: 15px;
+    margin: 5px;
+    cursor: pointer;
+}
+
+.tag-list span:hover {
+    background-color: #ffd966;
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    background-color: #ffcc33;
+    padding: 10px;
+    margin-top: 30px;
+}

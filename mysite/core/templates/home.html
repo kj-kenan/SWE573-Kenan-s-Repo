@@ -1,0 +1,54 @@
+{% load static %} 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Hive 🐝</title>
+    <link rel="stylesheet" href="{% static 'core/style.css' %}">
+</head>
+<body>
+    <!--  Header -->
+    <header class="navbar">
+        <div class="logo">🐝 The Hive</div>
+        <nav>
+            <a href="#">🏠Home</a>
+            <a href="#">🤝🏻My Offers & Needs</a>
+            <a href="#">🍯Time Bank</a>
+            <a href="#">🐝Profile</a>
+            <a href="#">⚙️Settings</a>
+        </nav>
+    </header>
+
+    <!-- 🌼 Hero Section -->
+    <section class="hero">
+        <h1>Share your beellar, not dollar.</h1>
+        <p>Join the Hive — a community built on kindness and cooperation.</p>
+        <button class="cta" onclick="location.href='/offers/new/'">Post an Offer</button>
+
+    </section>
+
+    <!-- 🗺️ Map Placeholder -->
+    <section class="map">
+        <h2>Community Service Map</h2>
+        <div id="map-box">🗺️ Map coming soon...</div>
+    </section>
+
+    <!-- 🏷️ Tags -->
+    <section class="tags">
+        <h3>Explore by Tag:</h3>
+        <div class="tag-list">
+            <span>Cooking</span>
+            <span>Tutoring</span>
+            <span>Storytelling</span>
+            <span>Companionship</span>
+            <span>Errands</span>
+        </div>
+    </section>
+
+    <!-- 🐝 Footer -->
+    <footer>
+        <p>© 2025 The Hive | Built with ❤️ and Django</p>
+    </footer>
+</body>
+</html>
