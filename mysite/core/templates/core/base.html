@@ -1,0 +1,40 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}The Hive 🐝{% endblock %}</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- 🎨 Global ve App CSS -->
+    <link rel="stylesheet" href="{% static 'base.css' %}?v=2">  
+    <link rel="stylesheet" href="{% static 'core/style.css' %}?v=2">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- 🐝 Navbar -->
+    <header class="navbar">
+        <div class="logo">🐝 The Hive</div>
+        <nav>
+            <a href="{% url 'core:home' %}">🏠 Home</a>
+            <a href="#">🤝 Offers</a>
+            <a href="#">🍯 Time Bank</a>
+            <a href="#">🐝 Profile</a>
+            <a href="{% url 'core:about' %}">ℹ️ About</a>
+        </nav>
+    </header>
+
+    <!-- 🌼 Main Content -->
+    <main>
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <!-- 🐝 Footer -->
+    <footer>
+        <p>© 2025 The Hive | Built with ❤️ and Django</p>
+    </footer>
+</body>
+</html>

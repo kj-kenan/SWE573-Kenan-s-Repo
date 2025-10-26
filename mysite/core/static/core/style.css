@@ -1,37 +1,44 @@
+/* ---------------------------------------------------
+   The Hive — App-specific Styles (uses base.css vars)
+--------------------------------------------------- */
+
+/* Genel görünüm */
 body {
-    font-family: 'Poppins', sans-serif;
-    background-color: #fffbee;
+    font-family: var(--font-family-main);
+    background-color: var(--color-bg);
     margin: 0;
     padding: 0;
-    color: #333;
+    color: var(--color-text);
 }
 
-/* Navbar */
+/* 🐝 Navbar */
 .navbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background-color: #ffcc33;
-    padding: 10px 40px;
+    background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+    padding: 12px 40px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
 .navbar a {
     text-decoration: none;
-    color: #333;
+    color: var(--color-text);
     margin: 0 10px;
     font-weight: bold;
+    transition: color 0.2s ease;
 }
 
 .navbar a:hover {
-    color: #805500;
+    color: var(--color-accent);
 }
 
-/* Hero */
+/* 🌼 Hero */
 .hero {
     text-align: center;
     padding: 80px 20px;
-    background-color: #fff5cc;
+    background-color: var(--color-highlight);
+    background: radial-gradient(circle at top, #FFFBE6, var(--color-highlight));
 }
 
 .hero h1 {
@@ -39,34 +46,39 @@ body {
     color: #444;
 }
 
+/* 🍯 CTA Button */
 .cta {
     margin-top: 20px;
     padding: 12px 25px;
     font-size: 1em;
-    background-color: #ffcc33;
+    background: linear-gradient(135deg, var(--color-secondary), var(--color-accent));
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
-
+    color: white;
     display: inline-block;
-    transition: transform 0.2s ease, background-color 0.2s ease;
+    transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
 .cta:hover {
-    background-color: #ffd966;
+    background: linear-gradient(135deg, var(--color-accent), var(--color-secondary));
     transform: scale(1.05);
 }
 
-/* Map */
-.map {
-    text-align: center;
-    padding: 50px;
+/* 🗺️ Map */
+#map {
+    width: 80%;
+    height: 250px;
+    margin: 0 auto;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
 
 #map-box {
     width: 80%;
-    height: 300px;
-    background-color: #f7e89f;
+    height: 400px;
+    background-color: var(--color-highlight);
     margin: 0 auto;
     border-radius: 10px;
     line-height: 300px;
@@ -74,7 +86,7 @@ body {
     font-size: 1.2em;
 }
 
-/* Tags */
+/* 🏷️ Tags */
 .tags {
     text-align: center;
     padding: 30px;
@@ -82,21 +94,24 @@ body {
 
 .tag-list span {
     display: inline-block;
-    background-color: #ffec99;
+    background-color: var(--color-highlight);
     padding: 8px 15px;
     border-radius: 15px;
     margin: 5px;
     cursor: pointer;
+    transition: background-color 0.2s ease;
 }
 
 .tag-list span:hover {
-    background-color: #ffd966;
+    background-color: var(--color-secondary);
+    color: white;
 }
 
-/* Footer */
+/* 🐝 Footer */
 footer {
     text-align: center;
-    background-color: #ffcc33;
+    background: linear-gradient(90deg, var(--color-primary), var(--color-highlight));
     padding: 10px;
     margin-top: 30px;
+    color: #333;
 }

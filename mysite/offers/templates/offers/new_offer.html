@@ -1,23 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    {% load static %}
-    <meta charset="UTF-8">
-    <title>Post a New Offer 🐝</title>
-    <link rel="stylesheet" href="{% static 'core/style.css' %}">
-</head>
-<body>
-    <header class="navbar">
-        <div class="logo">🐝 The Hive</div>
-        <nav>
-            <a href="/">Home</a>
-            <a href="#">My Offers & Needs</a>
-            <a href="#">TimeBank (Beellars)</a>
-            <a href="#">Settings</a>
-        </nav>
-    </header>
 
-    <section class="hero">
+{% extends 'core/base.html' %}
+
+{% block title %}About | The Hive{% endblock %}
+
+{% block content %}
+ <section class="hero">
         <h1>Create a New Offer</h1>
         <form class="offer-form">
             <input type="text" placeholder="Offer Title"><br><br>
@@ -27,5 +14,4 @@
             <button class="cta">Share my Offer</button>
         </form>
     </section>
-</body>
-</html>
+{% endblock %}

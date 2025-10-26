@@ -1,0 +1,97 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap');
+
+:root {
+    /* 🎨 The Hive Color Palette */
+    --color-primary: #FFB627;
+    --color-secondary: #FF9505;
+    --color-accent: #E2711D;
+    --color-highlight: #FFC971;
+
+    --color-bg: #FFFBE6;
+    --color-text: #333333;
+
+
+    --font-family-main: 'Nunito', sans-serif;
+}
+
+/* Genel Temel Ayarlar */
+body {
+    font-family: var(--font-family-main);
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    margin: 0;
+    padding: 0;
+}
+
+
+
+:root {
+    /* 🎨 The Hive Color Palette */
+    --color-primary: #FFB627;
+    --color-secondary: #FF9505;
+    --color-accent: #E2711D;
+    --color-highlight: #FFC971;
+
+    --color-bg: #FFFBE6;
+    --color-text: #333333;
+
+    --font-family-main: 'Nunito', sans-serif;
+}
+
+
+/* Navbar */
+.navbar {
+    background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 40px;
+}
+
+
+.navbar a {
+    color: var(--color-text);
+    text-decoration: none;
+    font-weight: bold;
+    margin: 0 10px;
+    transition: color 0.2s ease;
+}
+
+.navbar a:hover {
+    color: var(--color-accent);
+}
+
+/* CTA Button */
+.cta {
+    background: linear-gradient(135deg, var(--color-secondary), var(--color-accent));
+    border: none;
+    border-radius: 10px;
+    color: white;
+    padding: 12px 25px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.cta:hover {
+    background: linear-gradient(135deg, var(--color-accent), var(--color-secondary));
+    transform: scale(1.05);
+}
+
+
+/* Footer */
+footer {
+    background: linear-gradient(90deg, var(--color-primary), var(--color-highlight));
+    text-align: center;
+    padding: 10px;
+    color: #333;
+}
+
+
+.hero {
+    text-align: center;
+    padding: 80px 20px;
+    background: radial-gradient(circle at top, #FFFBE6, var(--color-highlight));
+}
