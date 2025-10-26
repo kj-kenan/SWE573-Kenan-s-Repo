@@ -1,0 +1,17 @@
+Functional Requirements
+
+The system shall include an interactive map where users can post their Offers and Needs.
+
+Each Offer or Need shall contain a short description (e.g., “Reading stories with children”, “Help with homework”).
+
+Users shall describe their Offers and Needs using semantic tags (e.g., cooking, tutoring, companionship, errands, storytelling).
+
+One hour of any service shall equal one TimeBank hour.
+
+Every user shall be able to both give and receive services.
+
+Non-Functional Requirements 
+
+The architecture shall be designed to support a culture of mutual support and cooperation.
+
+The interface shall be simple and welcoming, reflecting inclusiveness and mutual support rather than competition.
