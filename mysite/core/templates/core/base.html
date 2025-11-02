@@ -11,6 +11,9 @@
     <link rel="stylesheet" href="{% static 'base.css' %}?v=2">  
     <link rel="stylesheet" href="{% static 'core/style.css' %}?v=2">
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet">
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'core/style.css' %}">
+
 </head>
 
 <body>
@@ -19,10 +22,11 @@
         <div class="logo">🐝 The Hive</div>
         <nav>
             <a href="{% url 'core:home' %}">🏠 Home</a>
-            <a href="#">🤝 Offers</a>
-            <a href="#">🍯 Time Bank</a>
-            <a href="#">🐝 Profile</a>
-            <a href="{% url 'core:about' %}">ℹ️ About</a>
+            <a href="/map/">🗺️ Map</a>
+            <a href="/myposts/">📬 My Posts</a>
+            <a href="/timebank/">🍯 TimeBank</a>
+            <a href="/commons/">💬 Commons</a>
+            <a href="/profile/">👤 Profile</a>
         </nav>
     </header>
 
