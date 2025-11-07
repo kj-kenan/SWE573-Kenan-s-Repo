@@ -1,0 +1,25 @@
+
+🐳  DOCKER – DJANGO COMMAND REFERENCE 
+================================================
+
+Purpose                              | Regular Django Command                                | Docker Equivalent                                                                 | Description
+------------------------------------ | ------------------------------------------------------ | --------------------------------------------------------------------------------- | --------------------------------------------
+Start development server              | python manage.py runserver                            | docker compose -f docker-compose.dev.yml up                                       | Starts Django on 0.0.0.0:8000
+Rebuild containers (after changes)    | —                                                      | docker compose -f docker-compose.dev.yml up --build                               | Rebuilds image and restarts services
+Run in background (detached)          | —                                                      | docker compose -f docker-compose.dev.yml up -d                                    | Runs containers in background
+Stop all containers                   | Ctrl + C                                               | docker compose -f docker-compose.dev.yml down                                     | Stops all running containers
+Clean reset (remove volumes)          | —                                                      | docker compose -f docker-compose.dev.yml down -v                                  | Removes containers and database volumes
+Create new migrations                 | python manage.py makemigrations                        | docker compose -f docker-compose.dev.yml exec web python mysite/manage.py makemigrations | Turns model changes into migrations
+Apply migrations                      | python manage.py migrate                               | docker compose -f docker-compose.dev.yml exec web python mysite/manage.py migrate | Applies migrations to the database
+Create superuser                      | python manage.py createsuperuser                       | docker compose -f docker-compose.dev.yml exec web python mysite/manage.py createsuperuser | Creates admin user for /admin panel
+Open Django shell                     | python manage.py shell                                 | docker compose -f docker-compose.dev.yml exec web python mysite/manage.py shell   | Opens interactive Django shell
+Collect static files                  | python manage.py collectstatic                         | docker compose -f docker-compose.dev.yml exec web python mysite/manage.py collectstatic --noinput | Gathers all static assets
+View container logs                   | —                                                      | docker compose -f docker-compose.dev.yml logs -f                                  | Displays real-time logs
+Restart only web container            | —                                                      | docker compose -f docker-compose.dev.yml restart web                              | Restarts Django service without rebuilding
+Restart only database container       | —                                                      | docker compose -f docker-compose.dev.yml restart db                               | Restarts PostgreSQL container
+
+Quick Tips
+-----------
+• docker compose exec web ...   → Run a command inside the Django container.
+• docker compose logs -f        → Follow logs in real time.
+• docker compose ps             → See all active containers.
