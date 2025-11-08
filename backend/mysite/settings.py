@@ -2,8 +2,9 @@ from pathlib import Path
 import os
 import dj_database_url
 from dotenv import load_dotenv
+from datetime import timedelta
 
-# Ortam değişkenlerini oku (.env varsa)
+
 load_dotenv()
 
 
@@ -16,7 +17,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
-# === UYGULAMALAR ===
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -29,7 +30,7 @@ INSTALLED_APPS = [
     'corsheaders',
 ]
 
-# === MIDDLEWARE ===
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',  
@@ -42,11 +43,11 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# === URL & WSGI ===
+
 ROOT_URLCONF = 'mysite.urls'
 WSGI_APPLICATION = 'mysite.wsgi.application'
 
-# === TEMPLATE ===
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -62,7 +63,7 @@ TEMPLATES = [
     },
 ]
 
-# === DATABASE ===
+
 DATABASES = {
     "default": dj_database_url.config(
         default=os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR/'db.sqlite3'}"),
@@ -70,13 +71,13 @@ DATABASES = {
     )
 }
 
-# === CORS ===
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
 
-# === ŞİFRE DOĞRULAMA ===
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -84,13 +85,13 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# === DİL & ZAMAN ===
+
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# === STATİK DOSYALAR ===
+
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STORAGES = {
@@ -99,5 +100,21 @@ STORAGES = {
     }
 }
 
-# === DİĞER ===
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),   # token 30 dk geçerli
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),      # refresh token 1 gün geçerli
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+}

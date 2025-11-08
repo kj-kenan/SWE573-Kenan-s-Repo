@@ -3,6 +3,12 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .models import UserProfile
 from .serializers import UserProfileSerializer
+from django.contrib.auth.models import User
+from django.contrib.auth.hashers import make_password
+from rest_framework import status
+from django.contrib.auth import authenticate
+
+
 
 
 @api_view(["GET"])
@@ -37,3 +43,64 @@ def home(request):
 
 def about(request):
     return render(request, "core/about.html")
+
+
+
+@api_view(["POST"])
+def register_user(request):
+    """
+    Creates a new user account.
+    Expected JSON:
+    {
+        "username": "newuser",
+        "password": "123456",
+        "email": "example@mail.com"
+    }
+    """
+    data = request.data
+
+    # Basic validation
+    if not data.get("username") or not data.get("password"):
+        return Response({"error": "Username and password are required."},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    # Check if username already exists
+    if User.objects.filter(username=data["username"]).exists():
+        return Response({"error": "Username already taken."},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    # Create new user
+    user = User.objects.create(
+        username=data["username"],
+        email=data.get("email", ""),
+        password=make_password(data["password"])
+    )
+
+    return Response({"message": f"User '{user.username}' created successfully."},
+                    status=status.HTTP_201_CREATED)
+
+@api_view(["POST"])
+def login_user(request):
+    """
+    Authenticates a user.
+    Expected JSON:
+    {
+        "username": "user",
+        "password": "passweord"
+    }
+    """
+    data = request.data
+
+
+    if not data.get("username") or not data.get("password"):
+        return Response({"error": "Username and password are required."},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+
+    user = authenticate(username=data["username"], password=data["password"])
+
+    if user is not None:
+        return Response({"message": f"Welcome, {user.username}!"}, status=status.HTTP_200_OK)
+    else:
+        return Response({"error": "Invalid username or password."},
+                        status=status.HTTP_401_UNAUTHORIZED)
