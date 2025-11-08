@@ -14,6 +14,9 @@ import OffersList from "./components/OffersList";
 import Register from "./components/Register";
 import Login from "./components/Login";
 import ProfileList from "./components/ProfileList";
+import CreateService from "./components/CreateService";
+
+
 
 /* 🐝 Navbar Component
    - Hidden on Landing ("/")
@@ -43,6 +46,9 @@ function Navbar({ onLogout }) {
         </Link>
         <Link to="/settings" className="hover:text-orange-800">
           ⚙️ Settings
+        </Link>
+        <Link to="/create" className="hover:text-orange-800">
+         ➕ Post Offer / Need
         </Link>
 
         {/* Logout button */}
@@ -84,6 +90,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/profile" element={<ProfileList />} />
+          <Route path="/create" element={<CreateService />} />
           <Route
             path="/settings"
             element={

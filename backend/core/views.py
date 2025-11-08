@@ -7,7 +7,8 @@ from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 from rest_framework import status
 from django.contrib.auth import authenticate
-
+from .models import Offer, Request
+from .serializers import OfferSerializer, RequestSerializer
 
 
 
@@ -104,3 +105,21 @@ def login_user(request):
     else:
         return Response({"error": "Invalid username or password."},
                         status=status.HTTP_401_UNAUTHORIZED)
+    
+@api_view(['GET'])
+def get_offers(request):
+    offers = Offer.objects.all()
+    serializer = OfferSerializer(offers, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+def get_requests(request):
+    requests = Request.objects.all()
+    serializer = RequestSerializer(requests, many=True)
+    return Response(serializer.data)
+
+
+
+
+
+
