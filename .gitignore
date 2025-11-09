@@ -10,10 +10,7 @@ __pycache__/
 media/
 db.sqlite3
 
-# Environment
-.env
-venv/
-*.env
+
 
 # VS Code
 .vscode/
