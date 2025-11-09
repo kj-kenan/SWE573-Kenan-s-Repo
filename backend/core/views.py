@@ -9,6 +9,9 @@ from rest_framework import status
 from django.contrib.auth import authenticate
 from .models import Offer, Request
 from .serializers import OfferSerializer, RequestSerializer
+from django.http import JsonResponse
+
+
 
 
 
@@ -136,6 +139,7 @@ def requests_list_create(request):
 
 
 
-
+def home(request):
+    return JsonResponse({"message": "Welcome to The Hive"})
 
 
