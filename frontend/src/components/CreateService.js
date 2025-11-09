@@ -14,11 +14,14 @@ function CreateService() {
     longitude: "",
   });
 
-  // Semantic tags
   const [selectedTags, setSelectedTags] = useState([]);
-
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+
+  // ✅ environment değişkeni + fallback
+  const API_BASE_URL =
+    process.env.REACT_APP_API_BASE_URL ||
+    "https://swe573-kenan-s-repo.onrender.com";
 
   const handleChange = (e) => {
     setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
@@ -27,7 +30,7 @@ function CreateService() {
   const handleUseMyLocation = () => {
     if (!navigator.geolocation) {
       setIsError(true);
-      setMessage("Location is not supported by your browser.    ");
+      setMessage("Location is not supported by your browser.");
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -53,15 +56,15 @@ function CreateService() {
     setMessage("");
     setIsError(false);
 
+    // ✅ localhost yerine env tabanlı endpoint
     const endpoint =
       serviceType === "offer"
-        ? "http://127.0.0.1:8000/api/offers/"
-        : "http://127.0.0.1:8000/api/requests/";
+        ? `${API_BASE_URL}/api/offers/`
+        : `${API_BASE_URL}/api/requests/`;
 
     const payload = {
       ...formData,
       tags: selectedTags.join(", "),
-      
     };
 
     try {
@@ -76,7 +79,7 @@ function CreateService() {
       if (res.ok) {
         setIsError(false);
         setMessage(`Your ${serviceType} was posted successfully!`);
-        // reset
+        // reset form
         setFormData({
           title: "",
           description: "",
@@ -98,14 +101,12 @@ function CreateService() {
   };
 
   return (
-
     <div className="min-h-screen bg-gradient-to-b from-yellow-100 to-amber-200 flex items-center justify-center py-10">
       <div className="w-full max-w-xl bg-white rounded-2xl shadow-lg border border-amber-200">
         <div className="px-8 pt-8 pb-4">
           <h2 className="text-3xl font-bold text-center mb-6 text-amber-700">
             {serviceType === "offer" ? "Create an Offer" : "Create a Request"}
           </h2>
-
 
           <div className="flex justify-center gap-4 mb-6">
             <button
@@ -182,13 +183,11 @@ function CreateService() {
               className="block w-full mb-3 p-3 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
 
-           
             <TagSelector
               selectedTags={selectedTags}
               setSelectedTags={setSelectedTags}
             />
 
-           
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
               <input
                 type="number"
@@ -236,7 +235,6 @@ function CreateService() {
           )}
         </div>
 
-    
         <div className="h-2 bg-gradient-to-r from-amber-400 to-orange-500 rounded-b-2xl" />
       </div>
     </div>

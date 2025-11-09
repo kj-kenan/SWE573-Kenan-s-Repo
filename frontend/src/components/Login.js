@@ -6,14 +6,17 @@ function Login() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
+
+  // ✅ Environment variable + fallback for production
+  const API_BASE_URL =
+    process.env.REACT_APP_API_BASE_URL ||
+    "https://swe573-kenan-s-repo.onrender.com";
+
   const handleLogin = async (e) => {
     e.preventDefault();
-    
- 
 
-    
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/token/", {
+      const response = await fetch(`${API_BASE_URL}/api/token/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -27,12 +30,11 @@ function Login() {
       const data = await response.json();
 
       if (response.ok) {
-        // Save tokens in localStorage
+        // ✅ Store tokens in localStorage
         localStorage.setItem("access", data.access);
         localStorage.setItem("refresh", data.refresh);
         setMessage(`Welcome, ${username}!`);
         navigate("/home");
-
       } else {
         setMessage(data.detail || "Invalid credentials.");
       }
@@ -42,9 +44,11 @@ function Login() {
   };
 
   return (
-    <div style={{ maxWidth: "400px", margin: "40px auto", textAlign: "center" }}>
+    <div
+      style={{ maxWidth: "400px", margin: "40px auto", textAlign: "center" }}
+    >
       <h1 className="text-4xl font-extrabold text-gray-800 mb-4">
-         <span className="text-amber-600">Login</span>
+        <span className="text-amber-600">Login</span>
       </h1>
       <form onSubmit={handleLogin}>
         <input
@@ -63,11 +67,12 @@ function Login() {
           required
           style={{ display: "block", width: "100%", marginBottom: "10px" }}
         />
-        <button type="submit" 
+        <button
+          type="submit"
           className="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600
              text-white font-semibold py-3 px-6 rounded-xl shadow-lg text-lg transition-all duration-200"
-            >
-           Login
+        >
+          Login
         </button>
       </form>
 

@@ -7,12 +7,17 @@ function OffersList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // ✅ Environment variable + fallback
+  const API_BASE_URL =
+    process.env.REACT_APP_API_BASE_URL ||
+    "https://swe573-kenan-s-repo.onrender.com";
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [offersRes, requestsRes] = await Promise.all([
-          fetch("http://127.0.0.1:8000/api/offers/"),
-          fetch("http://127.0.0.1:8000/api/requests/"),
+          fetch(`${API_BASE_URL}/api/offers/`),
+          fetch(`${API_BASE_URL}/api/requests/`),
         ]);
 
         if (!offersRes.ok || !requestsRes.ok) {
@@ -32,7 +37,7 @@ function OffersList() {
     };
 
     fetchData();
-  }, []);
+  }, [API_BASE_URL]);
 
   if (loading) return <p className="text-center mt-10">Loading services...</p>;
   if (error) return <p className="text-center mt-10 text-red-600">{error}</p>;

@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from "react";
 
 function TimeBank() {
-  const [balance, setBalance] = useState(null);   // user's beellar amount
+  const [balance, setBalance] = useState(null); // user's beellar amount
   const [error, setError] = useState("");
+
+  // ✅ Environment variable + fallback
+  const API_BASE_URL =
+    process.env.REACT_APP_API_BASE_URL ||
+    "https://swe573-kenan-s-repo.onrender.com";
 
   useEffect(() => {
     const token = localStorage.getItem("access");
@@ -12,32 +17,36 @@ function TimeBank() {
       return;
     }
 
-    // Decode user_id from JWT
-    const decoded = JSON.parse(atob(token.split(".")[1]));
-    const userId = parseInt(decoded.user_id);
+    try {
+      // Decode user_id from JWT token
+      const decoded = JSON.parse(atob(token.split(".")[1]));
+      const userId = parseInt(decoded.user_id);
 
-    // Fetch all profiles (or the endpoint that includes timebank info)
-    fetch("http://127.0.0.1:8000/api/profiles/", {
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-      },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch profile data.");
-        return res.json();
+      // Fetch all profiles (or any endpoint containing timebank info)
+      fetch(`${API_BASE_URL}/api/profiles/`, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
       })
-      .then((data) => {
-        // find the profile that matches user_id
-        const profile = data.find((p, index) => index + 1 === userId);
-        if (profile) {
-          setBalance(profile.timebank_balance);
-        } else {
-          setError("User profile not found.");
-        }
-      })
-      .catch(() => setError("Server connection error."));
-  }, []);
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to fetch profile data.");
+          return res.json();
+        })
+        .then((data) => {
+          // Find the profile that matches the user_id
+          const profile = data.find((p) => p.id === userId);
+          if (profile) {
+            setBalance(profile.timebank_balance);
+          } else {
+            setError("User profile not found.");
+          }
+        })
+        .catch(() => setError("Server connection error."));
+    } catch {
+      setError("Invalid token format.");
+    }
+  }, [API_BASE_URL]);
 
   if (error) {
     return <p className="text-center text-red-600 mt-10">{error}</p>;

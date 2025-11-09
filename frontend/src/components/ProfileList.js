@@ -5,8 +5,13 @@ function ProfileList() {
   const [profiles, setProfiles] = useState([]);
   const [message, setMessage] = useState("");
 
+  // ✅ Environment variable + fallback
+  const API_BASE_URL =
+    process.env.REACT_APP_API_BASE_URL ||
+    "https://swe573-kenan-s-repo.onrender.com";
+
   useEffect(() => {
-    // localStorage'daki token'ı al
+    // Get JWT token from localStorage
     const token = localStorage.getItem("access");
 
     if (!token) {
@@ -14,10 +19,10 @@ function ProfileList() {
       return;
     }
 
-    // Token'ı Authorization header'ına ekleyerek istek at
-    fetch("http://127.0.0.1:8000/api/profiles/", {
+    // Fetch all profiles with Authorization header
+    fetch(`${API_BASE_URL}/api/profiles/`, {
       headers: {
-        "Authorization": `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
     })
       .then((response) => {
@@ -32,10 +37,12 @@ function ProfileList() {
       .catch((error) => {
         setMessage(error.message);
       });
-  }, []);
+  }, [API_BASE_URL]);
 
   return (
-    <div style={{ maxWidth: "600px", margin: "40px auto", textAlign: "center" }}>
+    <div
+      style={{ maxWidth: "600px", margin: "40px auto", textAlign: "center" }}
+    >
       <h2>User Profiles</h2>
       {message && <p style={{ color: "red" }}>{message}</p>}
       <ul style={{ listStyle: "none", padding: 0 }}>

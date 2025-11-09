@@ -5,19 +5,23 @@ import { useNavigate } from "react-router-dom";
 import offerIcon from "../assets/offer.png";
 import needIcon from "../assets/need.png";
 
-
 function Home() {
   const navigate = useNavigate();
+
+  // ✅ environment değişkeni + fallback
+  const API_BASE_URL =
+    process.env.REACT_APP_API_BASE_URL ||
+    "https://swe573-kenan-s-repo.onrender.com";
 
   const handleCreateClick = () => {
     navigate("/create");
   };
 
   useEffect(() => {
-    // Map initialization on Kuzey Campus
+    // 🗺️ Map initialization on Kuzey Campus
     const map = L.map("map").setView([41.085339, 29.045607], 15);
 
-    // Maptiler
+    // 🗺️ Maptiler
     L.tileLayer(
       `https://api.maptiler.com/maps/pastel/256/{z}/{x}/{y}.png?key=GpfLIUr8LS7XQvnlcAnU`,
       {
@@ -26,7 +30,7 @@ function Home() {
       }
     ).addTo(map);
 
-    // Map Icons
+    // 🐝 Custom Icons
     const offerMarker = L.icon({
       iconUrl: offerIcon,
       iconSize: [38, 38],
@@ -41,37 +45,41 @@ function Home() {
       popupAnchor: [0, -38],
     });
 
-    // 🐝 Offers çek
-    fetch("http://127.0.0.1:8000/api/offers/")
+    // 🍯 Offers fetch
+    fetch(`${API_BASE_URL}/api/offers/`)
       .then((res) => res.json())
       .then((offers) => {
         offers.forEach((offer) => {
           if (offer.latitude && offer.longitude) {
             L.marker([offer.latitude, offer.longitude], { icon: offerMarker })
               .addTo(map)
-              .bindPopup(`<b>🍯 ${offer.title}</b><br>${offer.description || ""}`);
+              .bindPopup(
+                `<b>🍯 ${offer.title}</b><br>${offer.description || ""}`
+              );
           }
         });
       })
       .catch((err) => console.error("Offer fetch error:", err));
 
-    // 💬 Needs çek
-    fetch("http://127.0.0.1:8000/api/requests/")
+    // 💬 Requests fetch
+    fetch(`${API_BASE_URL}/api/requests/`)
       .then((res) => res.json())
       .then((requests) => {
         requests.forEach((req) => {
           if (req.latitude && req.longitude) {
             L.marker([req.latitude, req.longitude], { icon: needMarker })
               .addTo(map)
-              .bindPopup(`<b>💬 ${req.title}</b><br>${req.description || ""}`);
+              .bindPopup(
+                `<b>💬 ${req.title}</b><br>${req.description || ""}`
+              );
           }
         });
       })
       .catch((err) => console.error("Request fetch error:", err));
 
-    // 🧹 Temizlik
+    // 🧹 Cleanup
     return () => map.remove();
-  }, []);
+  }, [API_BASE_URL]);
 
   const tags = ["Cooking", "Tutoring", "Storytelling", "Companionship", "Errands"];
 

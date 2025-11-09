@@ -5,21 +5,31 @@ function MyOffers() {
   const [loading, setLoading] = useState(true);    // true while fetching data
   const [error, setError] = useState("");          // stores any error message
 
-  useEffect(() => {
-    // Get JWT token from localStorage
-    const token = localStorage.getItem("access");
+  // ✅ Environment variable + fallback
+  const API_BASE_URL =
+    process.env.REACT_APP_API_BASE_URL ||
+    "https://swe573-kenan-s-repo.onrender.com";
 
-    // Fetch all offers from backend
-    fetch("http://127.0.0.1:8000/api/offers/", {
+  useEffect(() => {
+    const token = localStorage.getItem("access");
+    if (!token) {
+      setError("You must be logged in to view your offers.");
+      setLoading(false);
+      return;
+    }
+
+    // Fetch all offers from the backend
+    fetch(`${API_BASE_URL}/api/offers/`, {
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`, // include authentication header
+        Authorization: `Bearer ${token}`, // include authentication header
       },
     })
       .then((res) => res.json())
       .then((data) => {
         // Decode JWT to get the username of the logged-in user
-        const user = JSON.parse(atob(token.split(".")[1])).username;
+        const decoded = JSON.parse(atob(token.split(".")[1]));
+        const user = decoded.username || decoded.user || "";
 
         // Filter only the offers created by this user
         const myOffers = data.filter((offer) => offer.user === user);
@@ -27,7 +37,7 @@ function MyOffers() {
       })
       .catch(() => setError("Unable to load your offers."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [API_BASE_URL]);
 
   if (loading) return <p className="text-center mt-10">Loading your offers...</p>;
   if (error) return <p className="text-center text-red-600">{error}</p>;
@@ -49,7 +59,9 @@ function MyOffers() {
               key={offer.id}
               className="border p-4 rounded-lg shadow-sm hover:shadow-md transition"
             >
-              <h3 className="font-bold text-lg mb-1 text-amber-700">{offer.title}</h3>
+              <h3 className="font-bold text-lg mb-1 text-amber-700">
+                {offer.title}
+              </h3>
               <p className="text-gray-700 mb-2">{offer.description}</p>
               <p className="text-sm text-gray-500">
                 🏷️ {offer.category} | ⏰ {offer.duration}
