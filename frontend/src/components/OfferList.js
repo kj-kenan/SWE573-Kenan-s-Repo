@@ -1,4 +1,3 @@
-// src/components/OffersList.js
 import React, { useEffect, useState } from "react";
 
 function OffersList() {
@@ -42,26 +41,27 @@ function OffersList() {
 
   return (
     <div className="max-w-4xl mx-auto mt-10 p-6 bg-white shadow-md rounded-lg">
-      <h2 className="text-3xl font-bold mb-6 text-center">Community Services</h2>
+      <h2 className="text-3xl font-bold mb-6 text-center text-amber-700">
+        Community Services
+      </h2>
 
-      {/* Toggle buttons */}
-      <div className="flex justify-center mb-4 gap-4">
+      <div className="flex justify-center mb-6 gap-4">
         <button
           onClick={() => setActiveTab("offers")}
-          className={`px-4 py-2 rounded ${
+          className={`px-4 py-2 rounded font-semibold transition ${
             activeTab === "offers"
-              ? "bg-amber-500 text-white"
-              : "bg-gray-200 text-gray-700"
+              ? "bg-amber-500 text-white shadow"
+              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
           }`}
         >
           Offers
         </button>
         <button
           onClick={() => setActiveTab("requests")}
-          className={`px-4 py-2 rounded ${
+          className={`px-4 py-2 rounded font-semibold transition ${
             activeTab === "requests"
-              ? "bg-amber-500 text-white"
-              : "bg-gray-200 text-gray-700"
+              ? "bg-amber-500 text-white shadow"
+              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
           }`}
         >
           Requests
@@ -79,7 +79,9 @@ function OffersList() {
               key={item.id}
               className="border p-4 rounded-lg shadow-sm hover:shadow-md transition"
             >
-              <h3 className="font-bold text-lg mb-1">{item.title}</h3>
+              <h3 className="font-bold text-lg mb-1 text-amber-700">
+                {item.title}
+              </h3>
               <p className="text-gray-700 mb-2">{item.description}</p>
               <p className="text-sm text-gray-500">
                 🏷️ {item.category} | ⏰ {item.duration}

@@ -1,10 +1,10 @@
-// src/components/Home.js
 import React, { useEffect } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useNavigate } from "react-router-dom";
 import offerIcon from "../assets/offer.png";
 import needIcon from "../assets/need.png";
+
 
 function Home() {
   const navigate = useNavigate();
@@ -14,10 +14,10 @@ function Home() {
   };
 
   useEffect(() => {
-    // 🌍 Harita oluştur
-    const map = L.map("map").setView([41.0082, 28.9784], 12);
+    // Map initialization on Kuzey Campus
+    const map = L.map("map").setView([41.085339, 29.045607], 15);
 
-    // 🍯 Pastel MapTiler tile layer
+    // Maptiler
     L.tileLayer(
       `https://api.maptiler.com/maps/pastel/256/{z}/{x}/{y}.png?key=GpfLIUr8LS7XQvnlcAnU`,
       {
@@ -26,7 +26,7 @@ function Home() {
       }
     ).addTo(map);
 
-    // 🧈 Özel marker ikonları
+    // Map Icons
     const offerMarker = L.icon({
       iconUrl: offerIcon,
       iconSize: [38, 38],

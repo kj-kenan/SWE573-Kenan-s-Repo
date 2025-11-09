@@ -4,3 +4,6 @@ psycopg2-binary>=2.9
 dj-database-url>=2.2
 whitenoise>=6.7
 python-dotenv>=1.0
+djangorestframework>=3.14
+django-cors-headers>=4.0
+djangorestframework-simplejwt>=5.3.0
