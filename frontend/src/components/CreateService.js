@@ -66,6 +66,7 @@ function CreateService() {
     const payload = {
       ...formData,
       tags: selectedTags.join(", "),
+      
     };
 
     try {

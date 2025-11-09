@@ -43,7 +43,9 @@ function Login() {
 
   return (
     <div style={{ maxWidth: "400px", margin: "40px auto", textAlign: "center" }}>
-      <h2>Login</h2>
+      <h1 className="text-4xl font-extrabold text-gray-800 mb-4">
+         <span className="text-amber-600">Login</span>
+      </h1>
       <form onSubmit={handleLogin}>
         <input
           type="text"
@@ -61,13 +63,16 @@ function Login() {
           required
           style={{ display: "block", width: "100%", marginBottom: "10px" }}
         />
-        <button type="submit" style={{ width: "100%", padding: "8px" }}>
-          Login
+        <button type="submit" 
+          className="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600
+             text-white font-semibold py-3 px-6 rounded-xl shadow-lg text-lg transition-all duration-200"
+            >
+           Login
         </button>
       </form>
 
       {message && (
-        <p style={{ marginTop: "20px", color: "green" }}>{message}</p>
+        <p style={{ marginTop: "20px", color: "amber" }}>{message}</p>
       )}
     </div>
   );

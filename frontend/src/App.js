@@ -15,6 +15,7 @@ import Register from "./components/Register";
 import Login from "./components/Login";
 import ProfileList from "./components/ProfileList";
 import CreateService from "./components/CreateService";
+import ServiceMap from "./components/ServiceMap";
 
 
 
@@ -26,7 +27,8 @@ function Navbar({ onLogout }) {
   const location = useLocation();
 
   // Hide Navbar on the Landing page
-  if (location.pathname === "/") return null;
+  if (location.pathname === "/" || location.pathname === "/login" || location.pathname === "/register")
+  return null;
 
   return (
     <header className="flex justify-between items-center bg-gradient-to-r from-amber-400 to-orange-500 shadow-md px-10 py-4">
@@ -47,9 +49,7 @@ function Navbar({ onLogout }) {
         <Link to="/settings" className="hover:text-orange-800">
           ⚙️ Settings
         </Link>
-        <Link to="/create" className="hover:text-orange-800">
-         ➕ Post Offer / Need
-        </Link>
+  
 
         {/* Logout button */}
         <button
@@ -108,7 +108,7 @@ function App() {
 
       {/* Footer */}
       <footer className="bg-gradient-to-r from-amber-400 to-yellow-300 text-center py-3">
-        <p>© 2025 The Hive | Built with ❤️ using React + Django</p>
+        <p>© 2025 The Hive</p>
       </footer>
     </div>
   );

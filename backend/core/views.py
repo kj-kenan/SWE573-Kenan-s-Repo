@@ -106,17 +106,33 @@ def login_user(request):
         return Response({"error": "Invalid username or password."},
                         status=status.HTTP_401_UNAUTHORIZED)
     
-@api_view(['GET'])
-def get_offers(request):
-    offers = Offer.objects.all()
-    serializer = OfferSerializer(offers, many=True)
-    return Response(serializer.data)
+@api_view(['GET', 'POST'])
+def offers_list_create(request):
+    if request.method == 'GET':
+        offers = Offer.objects.all()
+        serializer = OfferSerializer(offers, many=True)
+        return Response(serializer.data)
 
-@api_view(['GET'])
-def get_requests(request):
-    requests = Request.objects.all()
-    serializer = RequestSerializer(requests, many=True)
-    return Response(serializer.data)
+    elif request.method == 'POST':
+        serializer = OfferSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'POST'])
+def requests_list_create(request):
+    if request.method == 'GET':
+        requests = Request.objects.all()
+        serializer = RequestSerializer(requests, many=True)
+        return Response(serializer.data)
+    elif request.method == 'POST':
+        serializer = RequestSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 
