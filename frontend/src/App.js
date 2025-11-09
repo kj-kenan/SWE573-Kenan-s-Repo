@@ -13,7 +13,7 @@ import Register from "./components/Register";
 import Login from "./components/Login";
 import ProfileList from "./components/ProfileList";
 import CreateService from "./components/CreateService";
-import ServiceMap from "./components/ServiceMap";
+//import ServiceMap from "./components/ServiceMap";
 import thehiveicon from "./assets/thehive.png";
 import homeIcon from "./assets/home.svg";
 import offersIcon from "./assets/offers.svg";
@@ -21,7 +21,7 @@ import timebankIcon from "./assets/timebank.svg";
 import profileIcon from "./assets/profile.svg";
 import settingsIcon from "./assets/settings.svg";
 import logoutIcon from "./assets/logout.svg"; 
-import MyOffers from "./components/MyOffers";
+//import MyOffers from "./components/MyOffers";
 import OffersList from "./components/OfferList";
 import TimeBank from "./components/TimeBank";
 
