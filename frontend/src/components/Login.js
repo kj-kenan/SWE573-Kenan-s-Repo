@@ -7,7 +7,6 @@ function Login() {
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
 
-  // ✅ Environment variable + fallback for production
   const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL ||
     "https://swe573-kenan-s-repo.onrender.com";
@@ -30,7 +29,6 @@ function Login() {
       const data = await response.json();
 
       if (response.ok) {
-        // ✅ Store tokens in localStorage
         localStorage.setItem("access", data.access);
         localStorage.setItem("refresh", data.refresh);
         setMessage(`Welcome, ${username}!`);
@@ -50,6 +48,7 @@ function Login() {
       <h1 className="text-4xl font-extrabold text-gray-800 mb-4">
         <span className="text-amber-600">Login</span>
       </h1>
+
       <form onSubmit={handleLogin}>
         <input
           type="text"
@@ -77,8 +76,19 @@ function Login() {
       </form>
 
       {message && (
-        <p style={{ marginTop: "20px", color: "amber" }}>{message}</p>
+        <p className="mt-4 text-red-600 font-medium">{message}</p>
       )}
+
+      {/* 🔸 Register yönlendirmesi */}
+      <p className="mt-6 text-gray-600 text-sm">
+        Don’t have an account?{" "}
+        <button
+          onClick={() => navigate("/register")}
+          className="text-amber-600 font-semibold hover:text-orange-500 transition-colors duration-200"
+        >
+          Register here
+        </button>
+      </p>
     </div>
   );
 }

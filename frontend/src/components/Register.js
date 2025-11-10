@@ -1,17 +1,17 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 function Register() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const navigate = useNavigate();
 
-  // ✅ Environment variable + fallback for production
   const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL ||
     "https://swe573-kenan-s-repo.onrender.com";
 
-  // ✅ Function triggered when the form is submitted
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -40,10 +40,13 @@ function Register() {
     }
   };
 
-  // ✅ Component render
   return (
     <div style={{ maxWidth: "400px", margin: "40px auto", textAlign: "center" }}>
-      <h2>Register</h2>
+      {/* 🟡 Başlık Login sayfasıyla uyumlu */}
+      <h1 className="text-4xl font-extrabold text-gray-800 mb-4">
+        <span className="text-amber-600">Register</span>
+      </h1>
+
       <form onSubmit={handleSubmit}>
         <input
           type="text"
@@ -70,24 +73,27 @@ function Register() {
         />
         <button
           type="submit"
-          style={{
-            width: "100%",
-            padding: "10px",
-            backgroundColor: "#f59e0b",
-            color: "white",
-            border: "none",
-            borderRadius: "6px",
-            fontWeight: "bold",
-            cursor: "pointer",
-          }}
+          className="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600
+             text-white font-semibold py-3 px-6 rounded-xl shadow-lg text-lg transition-all duration-200"
         >
           Register
         </button>
       </form>
 
       {message && (
-        <p style={{ marginTop: "20px", color: "green" }}>{message}</p>
+        <p className="mt-4 text-green-600 font-medium">{message}</p>
       )}
+
+      {/* 🔸 Login yönlendirmesi */}
+      <p className="mt-6 text-gray-600 text-sm">
+        Already have an account?{" "}
+        <button
+          onClick={() => navigate("/login")}
+          className="text-amber-600 font-semibold hover:text-orange-500 transition-colors duration-200"
+        >
+          Login here
+        </button>
+      </p>
     </div>
   );
 }
