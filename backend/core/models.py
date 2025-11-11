@@ -44,10 +44,12 @@ class UserProfile(models.Model):
 
 class Handshake(models.Model):
     STATUS_CHOICES = [
-        ("pending", "Pending"),
+        ("proposed", "Proposed"),
         ("accepted", "Accepted"),
-        ("declined", "Declined"),
+        ("in_progress", "In Progress"),
         ("completed", "Completed"),
+        ("settled", "Settled"),
+        ("declined", "Declined"),
     ]
 
     offer = models.ForeignKey(
@@ -63,16 +65,29 @@ class Handshake(models.Model):
         User, on_delete=models.CASCADE, related_name="requested_handshakes"
     )
     hours = models.PositiveIntegerField(default=1)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="proposed")
     provider_confirmed = models.BooleanField(default=False)
     seeker_confirmed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["provider", "seeker", "offer"], name="unique_offer_handshake"
+            )
+        ]
 
     def clean(self):
         if not (self.offer or self.request):
             raise ValidationError("Handshake must be linked to either an Offer or a Request.")
         if self.offer and self.request:
             raise ValidationError("Handshake cannot be linked to both Offer and Request.")
+
+    def save(self, *args, **kwargs):
+        # Auto-complete logic
+        if self.provider_confirmed and self.seeker_confirmed and self.status != "completed":
+            self.status = "completed"
+        super().save(*args, **kwargs)
 
     def __str__(self):
         target = self.offer.title if self.offer else self.request.title

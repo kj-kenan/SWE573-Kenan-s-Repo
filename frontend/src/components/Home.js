@@ -8,20 +8,50 @@ import needIcon from "../assets/need.png";
 function Home() {
   const navigate = useNavigate();
 
-  // ✅ environment değişkeni + fallback
   const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL ||
     "https://swe573-kenan-s-repo.onrender.com";
 
-  const handleCreateClick = () => {
-    navigate("/create");
+  const handleCreateClick = () => navigate("/create");
+
+  // --- Secure handshake function ---
+  const sendHandshake = async (offerId) => {
+    const token = localStorage.getItem("access");
+
+    if (!token) {
+      alert("Please log in first.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/handshakes/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          offer: offerId,
+          hours: 1, // can be adjusted later
+        }),
+      });
+
+      if (response.ok) {
+        alert("Handshake request sent successfully.");
+      } else {
+        const err = await response.json();
+        alert("Error: " + (err.detail || err.error || "Request failed"));
+      }
+    } catch (err) {
+      alert("Network error: " + err.message);
+    }
   };
 
   useEffect(() => {
-    // 🗺️ Map initialization on Kuzey Campus
+    // Initialize map
     const map = L.map("map").setView([41.085339, 29.045607], 15);
 
-    // 🗺️ Maptiler
+    // Maptiler base layer
     L.tileLayer(
       `https://api.maptiler.com/maps/pastel/256/{z}/{x}/{y}.png?key=GpfLIUr8LS7XQvnlcAnU`,
       {
@@ -30,38 +60,62 @@ function Home() {
       }
     ).addTo(map);
 
-    // 🐝 Custom Icons
-    const offerMarker = L.icon({
-      iconUrl: offerIcon,
-      iconSize: [38, 38],
-      iconAnchor: [19, 38],
-      popupAnchor: [0, -38],
-    });
+    // Marker configuration
+    const iconConfig = (url) =>
+      L.icon({
+        iconUrl: url,
+        iconSize: [38, 38],
+        iconAnchor: [19, 38],
+        popupAnchor: [0, -38],
+      });
 
-    const needMarker = L.icon({
-      iconUrl: needIcon,
-      iconSize: [38, 38],
-      iconAnchor: [19, 38],
-      popupAnchor: [0, -38],
-    });
+    const offerMarker = iconConfig(offerIcon);
+    const needMarker = iconConfig(needIcon);
 
-    // 🍯 Offers fetch
+    const buttonStyle = `
+      background:#fbbf24;
+      color:white;
+      padding:6px 10px;
+      border:none;
+      border-radius:8px;
+      cursor:pointer;
+    `;
+
+    // --- Load offers ---
     fetch(`${API_BASE_URL}/api/offers/`)
       .then((res) => res.json())
       .then((offers) => {
         offers.forEach((offer) => {
           if (offer.latitude && offer.longitude) {
-            L.marker([offer.latitude, offer.longitude], { icon: offerMarker })
+            const popupContent = `
+              <b>${offer.title}</b><br>
+              ${offer.description || ""}<br><br>
+              <button id="handshake-${offer.id}" style="${buttonStyle}">
+                Send Handshake
+              </button>
+            `;
+
+            const marker = L.marker([offer.latitude, offer.longitude], {
+              icon: offerMarker,
+            })
               .addTo(map)
-              .bindPopup(
-                `<b>🍯 ${offer.title}</b><br>${offer.description || ""}`
-              );
+              .bindPopup(popupContent);
+
+            marker.on("popupopen", () => {
+              const btn = document.getElementById(`handshake-${offer.id}`);
+              if (btn) btn.onclick = () => sendHandshake(offer.id);
+            });
+
+            marker.on("popupclose", () => {
+              const btn = document.getElementById(`handshake-${offer.id}`);
+              if (btn) btn.onclick = null;
+            });
           }
         });
       })
       .catch((err) => console.error("Offer fetch error:", err));
 
-    // 💬 Requests fetch
+    // --- Load requests ---
     fetch(`${API_BASE_URL}/api/requests/`)
       .then((res) => res.json())
       .then((requests) => {
@@ -69,15 +123,12 @@ function Home() {
           if (req.latitude && req.longitude) {
             L.marker([req.latitude, req.longitude], { icon: needMarker })
               .addTo(map)
-              .bindPopup(
-                `<b>💬 ${req.title}</b><br>${req.description || ""}`
-              );
+              .bindPopup(`<b>${req.title}</b><br>${req.description || ""}`);
           }
         });
       })
       .catch((err) => console.error("Request fetch error:", err));
 
-    // 🧹 Cleanup
     return () => map.remove();
   }, [API_BASE_URL]);
 
@@ -85,16 +136,17 @@ function Home() {
 
   return (
     <div className="text-center bg-yellow-50 min-h-screen">
+      {/* Header */}
       <section className="py-20 bg-gradient-to-b from-amber-100 to-yellow-50">
         <h1 className="text-4xl font-extrabold text-gray-800 mb-4">
-          Welcome back, <span className="text-amber-600">Bee!</span>
+          Welcome back, <span className="text-amber-600">Bee</span>
         </h1>
         <p className="text-gray-600 mb-6">
           Explore new opportunities and exchange your <b>beellars</b>.
         </p>
       </section>
 
-      {/* 🧭 Create Post Button */}
+      {/* Create Post Button */}
       <button
         onClick={handleCreateClick}
         className="mb-6 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600
@@ -103,10 +155,10 @@ function Home() {
         Create Post
       </button>
 
-      {/* 🗺️ Honey Map */}
+      {/* Map Section */}
       <section className="py-12">
-        <h2 className="text-4xl font-semibold mb-6">
-          <span className="text-amber-600">Honey Map</span>
+        <h2 className="text-4xl font-semibold mb-6 text-amber-600">
+          Honey Map
         </h2>
         <div
           id="map"
@@ -114,9 +166,9 @@ function Home() {
         ></div>
       </section>
 
-      {/* 🍯 Tags */}
+      {/* Tags Section */}
       <section className="py-12 bg-amber-100/50">
-        <h3 className="text-2xl font-semibold mb-4">Explore by Tag:</h3>
+        <h3 className="text-2xl font-semibold mb-4">Explore by Tag</h3>
         <div className="flex flex-wrap justify-center gap-3">
           {tags.map((tag) => (
             <span
