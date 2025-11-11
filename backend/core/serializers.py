@@ -17,7 +17,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 # OFFER & REQUEST
 # ---------------------------------------------------------------------------
 class OfferSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(source="user.username", read_only=True)
+    username = serializers.SerializerMethodField()
 
     class Meta:
         model = Offer
@@ -27,6 +27,8 @@ class OfferSerializer(serializers.ModelSerializer):
             "username",
             "title",
             "description",
+            "duration",
+            "date",
             "tags",
             "latitude",
             "longitude",
@@ -35,9 +37,12 @@ class OfferSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["user", "status", "created_at"]
 
+    def get_username(self, obj):
+        return obj.user.username if obj.user else None
+
 
 class RequestSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(source="user.username", read_only=True)
+    username = serializers.SerializerMethodField()
 
     class Meta:
         model = Request
@@ -47,6 +52,8 @@ class RequestSerializer(serializers.ModelSerializer):
             "username",
             "title",
             "description",
+            "duration",
+            "date",
             "tags",
             "latitude",
             "longitude",
@@ -54,6 +61,9 @@ class RequestSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["user", "status", "created_at"]
+
+    def get_username(self, obj):
+        return obj.user.username if obj.user else None
 
 
 # ---------------------------------------------------------------------------

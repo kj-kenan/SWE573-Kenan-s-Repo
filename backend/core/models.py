@@ -4,6 +4,16 @@ from django.core.exceptions import ValidationError
 
 
 class Offer(models.Model):
+    STATUS_CHOICES = [
+        ("open", "Open"),
+        ("in_progress", "In Progress"),
+        ("completed", "Completed"),
+        ("cancelled", "Cancelled"),
+    ]
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="offers", null=True, blank=True
+    )
     title = models.CharField(max_length=100)
     description = models.TextField()
     duration = models.CharField(max_length=50)
@@ -11,12 +21,26 @@ class Offer(models.Model):
     tags = models.CharField(max_length=200, blank=True)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default="open"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     def __str__(self):
         return f"Offer: {self.title}"
 
 
 class Request(models.Model):
+    STATUS_CHOICES = [
+        ("open", "Open"),
+        ("in_progress", "In Progress"),
+        ("completed", "Completed"),
+        ("cancelled", "Cancelled"),
+    ]
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="requests", null=True, blank=True
+    )
     title = models.CharField(max_length=100)
     description = models.TextField()
     duration = models.CharField(max_length=50)
@@ -24,6 +48,10 @@ class Request(models.Model):
     tags = models.CharField(max_length=200, blank=True)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default="open"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     def __str__(self):
         return f"Request: {self.title}"
