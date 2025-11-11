@@ -16,4 +16,4 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY . /app
 
 
-CMD ["bash", "-lc", "python manage.py collectstatic --noinput && python manage.py migrate && gunicorn mysite.wsgi:application --bind 0.0.0.0:8000 --workers 3"]
+CMD ["bash", "-lc", "cd backend && python manage.py collectstatic --noinput && python manage.py migrate && gunicorn mysite.wsgi:application --bind 0.0.0.0:8000 --workers 3"]
