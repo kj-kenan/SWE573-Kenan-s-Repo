@@ -130,7 +130,7 @@ function Home() {
       .catch((err) => console.error("Request fetch error:", err));
 
     return () => map.remove();
-  }, [API_BASE_URL]);
+  }, [API_BASE_URL, sendHandshake]);
 
   const tags = ["Cooking", "Tutoring", "Storytelling", "Companionship", "Errands"];
 
