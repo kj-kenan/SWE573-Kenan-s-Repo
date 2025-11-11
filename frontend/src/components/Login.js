@@ -13,6 +13,7 @@ function Login() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setMessage(""); // önceki hatayı temizle
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/token/`, {
@@ -21,23 +22,33 @@ function Login() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username: username,
-          password: password,
+          username: username.trim(),
+          password: password.trim(),
         }),
       });
 
+      // content-type kontrolü: JSON değilse hata fırlat
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(`Unexpected response type: ${contentType}`);
+      }
+
       const data = await response.json();
 
-      if (response.ok) {
+      if (response.ok && data.access && data.refresh) {
+        // ✅ Token'ları kaydet
         localStorage.setItem("access", data.access);
         localStorage.setItem("refresh", data.refresh);
+
         setMessage(`Welcome, ${username}!`);
         navigate("/home");
       } else {
-        setMessage(data.detail || "Invalid credentials.");
+        // login başarısız
+        setMessage(data.detail || "Invalid credentials. Please try again.");
       }
     } catch (error) {
-      setMessage("Server error. Please try again.");
+      console.error("Login error:", error);
+      setMessage("Server error. Please try again later.");
     }
   };
 
