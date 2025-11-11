@@ -1,10 +1,11 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
+
 
 class Offer(models.Model):
     title = models.CharField(max_length=100)
     description = models.TextField()
-    category = models.CharField(max_length=50)
     duration = models.CharField(max_length=50)
     date = models.DateField(null=True, blank=True)
     tags = models.CharField(max_length=200, blank=True)
@@ -18,7 +19,6 @@ class Offer(models.Model):
 class Request(models.Model):
     title = models.CharField(max_length=100)
     description = models.TextField()
-    category = models.CharField(max_length=50)
     duration = models.CharField(max_length=50)
     date = models.DateField(null=True, blank=True)
     tags = models.CharField(max_length=200, blank=True)
@@ -30,22 +30,67 @@ class Request(models.Model):
 
 
 class UserProfile(models.Model):
-    # Link each profile to exactly one Django User
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
-
-    # Public info (adjust as needed)
     bio = models.TextField(blank=True)
-    province = models.CharField(max_length=100, blank=True)   # only approximate location
+    province = models.CharField(max_length=100, blank=True)
     district = models.CharField(max_length=100, blank=True)
-
-    # Visibility preference (e.g., hide district until handshake)
     is_visible = models.BooleanField(default=True)
-
-    # TimeBank balance in hours (can be fractional, e.g., 1.5h)
-    timebank_balance = models.DecimalField(max_digits=6, decimal_places=2, default=0)
-
-    # Audit fields
+    timebank_balance = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"Profile({self.user.username})"
+
+
+class Handshake(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("accepted", "Accepted"),
+        ("declined", "Declined"),
+        ("completed", "Completed"),
+    ]
+
+    offer = models.ForeignKey(
+        Offer, on_delete=models.CASCADE, null=True, blank=True, related_name="handshakes"
+    )
+    request = models.ForeignKey(
+        Request, on_delete=models.CASCADE, null=True, blank=True, related_name="handshakes"
+    )
+    provider = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="provided_handshakes"
+    )
+    seeker = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="requested_handshakes"
+    )
+    hours = models.PositiveIntegerField(default=1)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    provider_confirmed = models.BooleanField(default=False)
+    seeker_confirmed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        if not (self.offer or self.request):
+            raise ValidationError("Handshake must be linked to either an Offer or a Request.")
+        if self.offer and self.request:
+            raise ValidationError("Handshake cannot be linked to both Offer and Request.")
+
+    def __str__(self):
+        target = self.offer.title if self.offer else self.request.title
+        return f"Handshake({self.provider.username} ↔ {self.seeker.username}) on {target}"
+
+
+class Transaction(models.Model):
+    handshake = models.ForeignKey(
+        Handshake, on_delete=models.CASCADE, related_name="transactions"
+    )
+    sender = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="sent_transactions"
+    )
+    receiver = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="received_transactions"
+    )
+    amount = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Transaction: {self.sender.username} → {self.receiver.username} ({self.amount} Beellar)"

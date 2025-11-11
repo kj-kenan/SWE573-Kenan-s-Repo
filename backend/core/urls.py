@@ -15,4 +15,8 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('offers/', views.offers_list_create, name='offers_list_create'),
     path('requests/', views.requests_list_create, name='requests_list_create'),
+    path("handshakes/<int:handshake_id>/accept/", views.handshake_accept),
+    path("handshakes/<int:handshake_id>/decline/", views.handshake_decline),
+    path("handshakes/<int:handshake_id>/confirm/", views.handshake_confirm),
+    path("transactions/", views.transactions_list),
 ]
