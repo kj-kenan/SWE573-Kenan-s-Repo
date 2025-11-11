@@ -81,7 +81,7 @@ def profile_list(request):
 @permission_classes([IsAuthenticated])
 def offers_list_create(request):
     if request.method == "GET":
-        offers = Offer.objects.all().order_by("-created_at")
+        offers = Offer.objects.all().order_by("-date")
         serializer = OfferSerializer(offers, many=True)
         return Response(serializer.data)
 
@@ -97,7 +97,7 @@ def offers_list_create(request):
 @permission_classes([IsAuthenticated])
 def requests_list_create(request):
     if request.method == "GET":
-        requests = Request.objects.all().order_by("-created_at")
+        requests = Request.objects.all().order_by("-date")
         serializer = RequestSerializer(requests, many=True)
         return Response(serializer.data)
 
@@ -120,7 +120,7 @@ def handshakes_list_create(request):
         user = request.user
         handshakes = Handshake.objects.filter(
             models.Q(provider=user) | models.Q(seeker=user)
-        ).order_by("-created_at")
+        ).order_by("-date")
         serializer = HandshakeSerializer(handshakes, many=True)
         return Response(serializer.data)
 
@@ -215,6 +215,6 @@ def handshake_confirm(request, handshake_id):
 def transactions_list(request):
     transactions = Transaction.objects.filter(
         models.Q(sender=request.user) | models.Q(receiver=request.user)
-    ).order_by("-created_at")
+    ).order_by("-date")
     serializer = TransactionSerializer(transactions, many=True)
     return Response(serializer.data)
