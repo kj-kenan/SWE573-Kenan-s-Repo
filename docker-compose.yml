@@ -17,19 +17,25 @@ services:
       retries: 10
 
   web:
-    build: .
+    build:
+      context: .
+      dockerfile: ./Dockerfile
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     env_file:
-      - .env        
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://hive:hive@db:5432/hive
+      - DEBUG=True
     volumes:
       - .:/app
     ports:
       - "8000:8000"
-    command: bash -lc "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
-
+    command: >
+      bash -lc "python manage.py migrate &&
+      gunicorn mysite.wsgi:application --bind 0.0.0.0:8000"
 
 volumes:
   pgdata:
