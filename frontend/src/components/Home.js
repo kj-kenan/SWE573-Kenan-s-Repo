@@ -14,7 +14,7 @@ function Home() {
 
   const handleCreateClick = () => navigate("/create");
 
-  
+  // --- Secure handshake function ---
   const sendHandshake = useCallback(
     async (offerId) => {
       const token = localStorage.getItem("access");
@@ -43,7 +43,7 @@ function Home() {
         alert("Network error: " + err.message);
       }
     },
-    [API_BASE_URL] 
+    [API_BASE_URL]
   );
 
   useEffect(() => {
@@ -77,8 +77,10 @@ function Home() {
       cursor:pointer;
     `;
 
-    //  Offers
-    fetch(`${API_BASE_URL}/api/offers/`)
+    // --- Load offers ---
+    fetch(`${API_BASE_URL}/api/offers/`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("access")}` },
+    })
       .then((res) => res.json())
       .then((offers) => {
         if (Array.isArray(offers)) {
@@ -115,8 +117,10 @@ function Home() {
       })
       .catch((err) => console.error("Offer fetch error:", err));
 
-    //  Requests
-    fetch(`${API_BASE_URL}/api/requests/`)
+    // --- Load requests ---
+    fetch(`${API_BASE_URL}/api/requests/`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("access")}` },
+    })
       .then((res) => res.json())
       .then((requests) => {
         if (Array.isArray(requests)) {
@@ -134,7 +138,7 @@ function Home() {
       .catch((err) => console.error("Request fetch error:", err));
 
     return () => map.remove();
-  }, [API_BASE_URL, sendHandshake]); // sendHandshake artık useCallback ile sabit
+  }, [API_BASE_URL, sendHandshake]);
 
   const tags = ["Cooking", "Tutoring", "Storytelling", "Companionship", "Errands"];
 
