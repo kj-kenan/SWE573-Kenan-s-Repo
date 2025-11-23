@@ -78,10 +78,19 @@ function Home() {
     `;
 
     // --- Load offers ---
-    fetch(`${API_BASE_URL}/api/offers/`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("access")}` },
-    })
-      .then((res) => res.json())
+    const token = localStorage.getItem("access");
+    const headers = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    fetch(`${API_BASE_URL}/api/offers/`, { headers })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then((offers) => {
         if (Array.isArray(offers)) {
           offers.forEach((offer) => {
@@ -118,10 +127,13 @@ function Home() {
       .catch((err) => console.error("Offer fetch error:", err));
 
     // --- Load requests ---
-    fetch(`${API_BASE_URL}/api/requests/`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("access")}` },
-    })
-      .then((res) => res.json())
+    fetch(`${API_BASE_URL}/api/requests/`, { headers })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then((requests) => {
         if (Array.isArray(requests)) {
           requests.forEach((req) => {

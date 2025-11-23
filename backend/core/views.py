@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db import models
 
-from .models import UserProfile, Offer, Request, Handshake, Transaction
+from .models import UserProfile, Offer, Request as RequestModel, Handshake, Transaction
 from .serializers import (
     UserProfileSerializer,
     OfferSerializer,
@@ -81,9 +81,14 @@ def profile_list(request):
 @permission_classes([AllowAny])
 def offers_list_create(request):
     if request.method == "GET":
-        offers = Offer.objects.all().order_by("-created_at")
-        serializer = OfferSerializer(offers, many=True)
-        return Response(serializer.data)
+        try:
+            offers = Offer.objects.all().order_by("-created_at")
+            serializer = OfferSerializer(offers, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     if not request.user.is_authenticated:
         return Response(
@@ -98,13 +103,35 @@ def offers_list_create(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def offer_detail(request, offer_id):
+    try:
+        offer = Offer.objects.get(pk=offer_id)
+        serializer = OfferSerializer(offer)
+        return Response(serializer.data)
+    except Offer.DoesNotExist:
+        return Response(
+            {"error": "Offer not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 @api_view(["GET", "POST"])
 @permission_classes([AllowAny])
 def requests_list_create(request):
     if request.method == "GET":
-        requests = Request.objects.all().order_by("-created_at")
-        serializer = RequestSerializer(requests, many=True)
-        return Response(serializer.data)
+        try:
+            requests = RequestModel.objects.all().order_by("-created_at")
+            serializer = RequestSerializer(requests, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     if not request.user.is_authenticated:
         return Response(
@@ -119,6 +146,23 @@ def requests_list_create(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def request_detail(request, request_id):
+    try:
+        request_obj = RequestModel.objects.get(pk=request_id)
+        serializer = RequestSerializer(request_obj)
+        return Response(serializer.data)
+    except RequestModel.DoesNotExist:
+        return Response(
+            {"error": "Request not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 # ---------------------------------------------------------------------------
 # HANDSHAKE SYSTEM
 # ---------------------------------------------------------------------------
@@ -130,7 +174,7 @@ def handshakes_list_create(request):
         user = request.user
         handshakes = Handshake.objects.filter(
             models.Q(provider=user) | models.Q(seeker=user)
-        ).order_by("-date")
+        ).order_by("-created_at")
         serializer = HandshakeSerializer(handshakes, many=True)
         return Response(serializer.data)
 
@@ -225,6 +269,6 @@ def handshake_confirm(request, handshake_id):
 def transactions_list(request):
     transactions = Transaction.objects.filter(
         models.Q(sender=request.user) | models.Q(receiver=request.user)
-    ).order_by("-date")
+    ).order_by("-created_at")
     serializer = TransactionSerializer(transactions, many=True)
     return Response(serializer.data)

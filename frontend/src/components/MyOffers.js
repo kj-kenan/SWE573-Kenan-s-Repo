@@ -25,17 +25,27 @@ function MyOffers() {
         Authorization: `Bearer ${token}`, // include authentication header
       },
     })
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then((data) => {
         // Decode JWT to get the username of the logged-in user
         const decoded = JSON.parse(atob(token.split(".")[1]));
-        const user = decoded.username || decoded.user || "";
+        const username = decoded.username || decoded.user_id || "";
 
-        // Filter only the offers created by this user
-        const myOffers = data.filter((offer) => offer.user === user);
+        // Filter only the offers created by this user (compare username)
+        const myOffers = Array.isArray(data)
+          ? data.filter((offer) => offer.username === username)
+          : [];
         setOffers(myOffers);
       })
-      .catch(() => setError("Unable to load your offers."))
+      .catch((err) => {
+        console.error("Error loading offers:", err);
+        setError("Unable to load your offers.");
+      })
       .finally(() => setLoading(false));
   }, [API_BASE_URL]);
 
@@ -64,7 +74,7 @@ function MyOffers() {
               </h3>
               <p className="text-gray-700 mb-2">{offer.description}</p>
               <p className="text-sm text-gray-500">
-                🏷️ {offer.category} | ⏰ {offer.duration}
+                🏷️ {offer.tags || "No tags"} | ⏰ {offer.duration || "N/A"}
               </p>
 
               {/* 🔸 Future actions: edit, delete, view handshakes */}

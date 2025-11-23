@@ -7,10 +7,20 @@ from .models import UserProfile, Offer, Request, Handshake, Transaction
 class UserProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
     email = serializers.CharField(source="user.email", read_only=True)
+    location = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
-        fields = ["id", "username", "email", "bio", "timebank_balance", "location"]
+        fields = ["id", "username", "email", "bio", "timebank_balance", "location", "province", "district"]
+
+    def get_location(self, obj):
+        if obj.province and obj.district:
+            return f"{obj.district}, {obj.province}"
+        elif obj.province:
+            return obj.province
+        elif obj.district:
+            return obj.district
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -18,6 +28,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------------
 class OfferSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
+    active_handshake = serializers.SerializerMethodField()
 
     class Meta:
         model = Offer
@@ -34,15 +45,33 @@ class OfferSerializer(serializers.ModelSerializer):
             "longitude",
             "status",
             "created_at",
+            "active_handshake",
         ]
         read_only_fields = ["user", "status", "created_at"]
 
     def get_username(self, obj):
         return obj.user.username if obj.user else None
 
+    def get_active_handshake(self, obj):
+        """Return active handshake info if exists"""
+        active = obj.handshakes.filter(
+            status__in=["proposed", "accepted", "in_progress"]
+        ).first()
+        if active:
+            return {
+                "id": active.id,
+                "status": active.status,
+                "seeker_username": active.seeker.username,
+                "provider_username": active.provider.username,
+                "hours": active.hours,
+                "created_at": active.created_at,
+            }
+        return None
+
 
 class RequestSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
+    active_handshake = serializers.SerializerMethodField()
 
     class Meta:
         model = Request
@@ -59,11 +88,28 @@ class RequestSerializer(serializers.ModelSerializer):
             "longitude",
             "status",
             "created_at",
+            "active_handshake",
         ]
         read_only_fields = ["user", "status", "created_at"]
 
     def get_username(self, obj):
         return obj.user.username if obj.user else None
+
+    def get_active_handshake(self, obj):
+        """Return active handshake info if exists"""
+        active = obj.handshakes.filter(
+            status__in=["proposed", "accepted", "in_progress"]
+        ).first()
+        if active:
+            return {
+                "id": active.id,
+                "status": active.status,
+                "seeker_username": active.seeker.username,
+                "provider_username": active.provider.username,
+                "hours": active.hours,
+                "created_at": active.created_at,
+            }
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -111,14 +157,35 @@ class HandshakeSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user = self.context["request"].user
         offer = validated_data.get("offer")
-        request = validated_data.get("request")
+        request_obj = validated_data.get("request")
 
         if offer:
-            provider = offer.user if hasattr(offer, "user") else offer.created_by
-        elif request:
-            provider = request.user if hasattr(request, "user") else request.created_by
+            provider = offer.user
+            # Check for existing active handshakes on this offer
+            active_handshakes = Handshake.objects.filter(
+                offer=offer,
+                status__in=["proposed", "accepted", "in_progress"]
+            ).exclude(id=None)
+            if active_handshakes.exists():
+                raise serializers.ValidationError(
+                    "This offer already has an active handshake. Please wait for it to complete or be declined."
+                )
+        elif request_obj:
+            provider = request_obj.user
+            # Check for existing active handshakes on this request
+            active_handshakes = Handshake.objects.filter(
+                request=request_obj,
+                status__in=["proposed", "accepted", "in_progress"]
+            ).exclude(id=None)
+            if active_handshakes.exists():
+                raise serializers.ValidationError(
+                    "This request already has an active handshake. Please wait for it to complete or be declined."
+                )
         else:
             raise serializers.ValidationError("Either offer or request must be provided.")
+
+        if not provider:
+            raise serializers.ValidationError("The post owner could not be determined.")
 
         if provider == user:
             raise serializers.ValidationError("You cannot initiate a handshake with yourself.")

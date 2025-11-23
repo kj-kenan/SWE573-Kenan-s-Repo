@@ -56,21 +56,34 @@ function CreateService() {
     setMessage("");
     setIsError(false);
 
+    // Check if user is logged in
+    const token = localStorage.getItem("access");
+    if (!token) {
+      setIsError(true);
+      setMessage("Please log in to create a post.");
+      return;
+    }
+
     // ✅ localhost yerine env tabanlı endpoint
     const endpoint =
       serviceType === "offer"
         ? `${API_BASE_URL}/api/offers/`
         : `${API_BASE_URL}/api/requests/`;
 
+    // Remove category field as it doesn't exist in the model
+    const { category, ...formDataWithoutCategory } = formData;
     const payload = {
-      ...formData,
+      ...formDataWithoutCategory,
       tags: selectedTags.join(", "),
     };
 
     try {
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(payload),
       });
 
@@ -92,11 +105,12 @@ function CreateService() {
         setSelectedTags([]);
       } else {
         setIsError(true);
-        setMessage(data.error || "Something went wrong.");
+        setMessage(data.detail || data.error || "Something went wrong.");
       }
-    } catch {
+    } catch (err) {
       setIsError(true);
       setMessage("Server connection error.");
+      console.error("Error posting service:", err);
     }
   };
 

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 function OffersList() {
+  const navigate = useNavigate();
   const [offers, setOffers] = useState([]);
   const [requests, setRequests] = useState([]);
   const [activeTab, setActiveTab] = useState("offers");
@@ -79,20 +81,33 @@ function OffersList() {
         </p>
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
-          {currentList.map((item) => (
-            <div
-              key={item.id}
-              className="border p-4 rounded-lg shadow-sm hover:shadow-md transition"
-            >
-              <h3 className="font-bold text-lg mb-1 text-amber-700">
-                {item.title}
-              </h3>
-              <p className="text-gray-700 mb-2">{item.description}</p>
-              <p className="text-sm text-gray-500">
-                🏷️ {item.category} | ⏰ {item.duration}
-              </p>
-            </div>
-          ))}
+          {currentList.map((item) => {
+            const detailPath = activeTab === "offers" 
+              ? `/offers/${item.id}` 
+              : `/requests/${item.id}`;
+            
+            return (
+              <div
+                key={item.id}
+                className="border p-4 rounded-lg shadow-sm hover:shadow-md transition cursor-pointer"
+                onClick={() => navigate(detailPath)}
+              >
+                <h3 className="font-bold text-lg mb-1 text-amber-700">
+                  {item.title}
+                </h3>
+                <p className="text-gray-700 mb-2 line-clamp-2">{item.description}</p>
+                <p className="text-sm text-gray-500 mb-2">
+                  🏷️ {item.tags || "No tags"} | ⏰ {item.duration || "N/A"}
+                </p>
+                {item.active_handshake && (
+                  <p className="text-xs text-amber-600 font-semibold">
+                    🤝 Active handshake ({item.active_handshake.status})
+                  </p>
+                )}
+                <p className="text-xs text-gray-400 mt-2">Click to view details →</p>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

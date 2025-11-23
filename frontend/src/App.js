@@ -24,6 +24,8 @@ import logoutIcon from "./assets/logout.svg";
 //import MyOffers from "./components/MyOffers";
 import OffersList from "./components/OfferList";
 import TimeBank from "./components/TimeBank";
+import OfferDetail from "./components/OfferDetail";
+import RequestDetail from "./components/RequestDetail";
 
 function Navbar({ onLogout }) {
   const location = useLocation();
@@ -156,7 +158,9 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/profile" element={<ProfileList />} />
           <Route path="/create" element={<CreateService />} />
-          <Route path="/offers" element={<OffersList />} /> 
+          <Route path="/offers" element={<OffersList />} />
+          <Route path="/offers/:id" element={<OfferDetail />} />
+          <Route path="/requests/:id" element={<RequestDetail />} />
           <Route path="/settings" element={<h1 className="text-center mt-20 text-3xl">Settings Page</h1>}/>
           <Route path="/timebank" element={<TimeBank/>}/>
         </Routes>
