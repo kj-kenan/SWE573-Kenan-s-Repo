@@ -18,11 +18,11 @@ function TimeBank() {
     }
 
     try {
-      // Decode user_id from JWT token
+      // Decode username from JWT token
       const decoded = JSON.parse(atob(token.split(".")[1]));
-      const userId = parseInt(decoded.user_id);
+      const username = decoded.username;
 
-      // Fetch all profiles (or any endpoint containing timebank info)
+      // Fetch all profiles
       fetch(`${API_BASE_URL}/api/profiles/`, {
         headers: {
           "Content-Type": "application/json",
@@ -30,21 +30,33 @@ function TimeBank() {
         },
       })
         .then((res) => {
-          if (!res.ok) throw new Error("Failed to fetch profile data.");
+          if (!res.ok) {
+            if (res.status === 401) {
+              throw new Error("Authentication failed. Please log in again.");
+            }
+            throw new Error("Failed to fetch profile data.");
+          }
           return res.json();
         })
         .then((data) => {
-          // Find the profile that matches the user_id
-          const profile = data.find((p) => p.id === userId);
+          // Find the profile that matches the username
+          const profile = Array.isArray(data) 
+            ? data.find((p) => p.username === username)
+            : null;
+          
           if (profile) {
-            setBalance(profile.timebank_balance);
+            setBalance(profile.timebank_balance || 0);
           } else {
-            setError("User profile not found.");
+            setError("User profile not found. Please try logging in again.");
           }
         })
-        .catch(() => setError("Server connection error."));
-    } catch {
-      setError("Invalid token format.");
+        .catch((err) => {
+          setError(err.message || "Server connection error.");
+          console.error("Error:", err);
+        });
+    } catch (err) {
+      setError("Invalid token format. Please log in again.");
+      console.error("Token decode error:", err);
     }
   }, [API_BASE_URL]);
 

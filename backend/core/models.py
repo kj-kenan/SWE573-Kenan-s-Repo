@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.db.models import Avg
 
 
 class Offer(models.Model):
@@ -17,7 +18,8 @@ class Offer(models.Model):
     title = models.CharField(max_length=100)
     description = models.TextField()
     duration = models.CharField(max_length=50)
-    date = models.DateField(null=True, blank=True)
+    date = models.DateField(null=True, blank=True)  # Deprecated, use available_slots
+    available_slots = models.TextField(blank=True, null=True, help_text="JSON array of available date/time slots")
     tags = models.CharField(max_length=200, blank=True)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
@@ -44,7 +46,8 @@ class Request(models.Model):
     title = models.CharField(max_length=100)
     description = models.TextField()
     duration = models.CharField(max_length=50)
-    date = models.DateField(null=True, blank=True)
+    date = models.DateField(null=True, blank=True)  # Deprecated, use available_slots
+    available_slots = models.TextField(blank=True, null=True, help_text="JSON array of available date/time slots")
     tags = models.CharField(max_length=200, blank=True)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
@@ -60,6 +63,9 @@ class Request(models.Model):
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     bio = models.TextField(blank=True)
+    skills = models.TextField(blank=True, help_text="Comma-separated list of skills")
+    interests = models.TextField(blank=True, help_text="Comma-separated list of interests")
+    profile_picture = models.ImageField(upload_to="profile_pictures/", blank=True, null=True)
     province = models.CharField(max_length=100, blank=True)
     district = models.CharField(max_length=100, blank=True)
     is_visible = models.BooleanField(default=True)
@@ -68,6 +74,19 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"Profile({self.user.username})"
+    
+    @property
+    def average_rating(self):
+        """Calculate average rating from all received ratings"""
+        ratings = Rating.objects.filter(rated_user=self.user)
+        if ratings.exists():
+            return round(ratings.aggregate(models.Avg("rating"))["rating__avg"] or 0, 2)
+        return 0.0
+    
+    @property
+    def total_ratings(self):
+        """Get total number of ratings received"""
+        return Rating.objects.filter(rated_user=self.user).count()
 
 
 class Handshake(models.Model):
@@ -137,3 +156,116 @@ class Transaction(models.Model):
 
     def __str__(self):
         return f"Transaction: {self.sender.username} → {self.receiver.username} ({self.amount} Beellar)"
+
+
+class Question(models.Model):
+    """Public pre-handshake questions displayed under posts"""
+    offer = models.ForeignKey(
+        Offer, on_delete=models.CASCADE, null=True, blank=True, related_name="questions"
+    )
+    request = models.ForeignKey(
+        Request, on_delete=models.CASCADE, null=True, blank=True, related_name="questions"
+    )
+    author = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="asked_questions"
+    )
+    content = models.TextField()
+    answer = models.TextField(blank=True, null=True, help_text="Answer from the post owner")
+    answered_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def clean(self):
+        if not (self.offer or self.request):
+            raise ValidationError("Question must be linked to either an Offer or a Request.")
+        if self.offer and self.request:
+            raise ValidationError("Question cannot be linked to both Offer and Request.")
+
+    def __str__(self):
+        target = self.offer.title if self.offer else self.request.title
+        return f"Question on {target} by {self.author.username}"
+
+
+class Message(models.Model):
+    """Private messages after handshake is accepted"""
+    handshake = models.ForeignKey(
+        Handshake, on_delete=models.CASCADE, related_name="messages"
+    )
+    sender = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="sent_messages"
+    )
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"Message from {self.sender.username} in handshake {self.handshake.id}"
+
+
+class Rating(models.Model):
+    """Ratings given after a completed handshake"""
+    RATING_CHOICES = [(i, i) for i in range(1, 6)]  # 1-5 stars
+    
+    handshake = models.ForeignKey(
+        Handshake, on_delete=models.CASCADE, related_name="ratings"
+    )
+    rater = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="ratings_given"
+    )
+    rated_user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="ratings_received"
+    )
+    rating = models.IntegerField(choices=RATING_CHOICES)
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        unique_together = [["handshake", "rater"]]  # One rating per user per handshake
+
+    def clean(self):
+        # Ensure rating is only given for completed handshakes
+        if self.handshake.status != "completed":
+            raise ValidationError("Ratings can only be given for completed handshakes.")
+        # Ensure rater is either provider or seeker in the handshake
+        if self.rater not in [self.handshake.provider, self.handshake.seeker]:
+            raise ValidationError("Only participants in the handshake can rate.")
+        # Ensure rated_user is the other participant
+        if self.rated_user not in [self.handshake.provider, self.handshake.seeker]:
+            raise ValidationError("You can only rate the other participant in the handshake.")
+        if self.rater == self.rated_user:
+            raise ValidationError("You cannot rate yourself.")
+
+    def __str__(self):
+        return f"Rating {self.rating}/5 from {self.rater.username} to {self.rated_user.username}"
+
+
+class Badge(models.Model):
+    """Badges earned by users for milestones"""
+    BADGE_TYPES = [
+        ("first_post", "First Post"),
+        ("first_handshake", "First Handshake"),
+        ("helper", "Helper"),
+        ("community_builder", "Community Builder"),
+        ("timebank_master", "TimeBank Master"),
+        ("rated_highly", "Highly Rated"),
+    ]
+    
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="badges"
+    )
+    badge_type = models.CharField(max_length=50, choices=BADGE_TYPES)
+    earned_at = models.DateTimeField(auto_now_add=True)
+    description = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-earned_at"]
+        unique_together = [["user", "badge_type"]]  # One badge of each type per user
+
+    def __str__(self):
+        return f"{self.user.username} - {self.get_badge_type_display()}"

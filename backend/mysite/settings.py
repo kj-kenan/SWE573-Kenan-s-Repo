@@ -64,13 +64,24 @@ TEMPLATES = [
 ]
 
 
-DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),
-        conn_max_age=600,
-        ssl_require=os.getenv('DATABASE_SSL_REQUIRE', 'False').lower() == 'true'
-    )
-}
+# Database configuration - uses SQLite locally if DATABASE_URL not set
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=os.getenv('DATABASE_SSL_REQUIRE', 'False').lower() == 'true'
+        )
+    }
+else:
+    # Local development - use SQLite
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 CORS_ALLOWED_ORIGINS = [

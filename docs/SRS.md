@@ -65,6 +65,21 @@ The system shall allow administrators to view and manage all registered users
 
 The system shall notify users upon successful registration or account changes
 
+The system shall allow users to edit their profile information (bio, skills, interests, and profile picture).
+
+The system shall allow users to view other users’ public profiles.
+
+The system shall allow users to delete or deactivate their accounts.
+
+The system shall allow administrators to view and manage all registered users.
+
+The system shall store and publicly display user ratings and feedback on user profiles.
+
+The system shall allow users to view and track their earned badges on their profiles.
+
+The system shall only allow users to rate each other after a handshake is fully completed. Ratings shall not be given for posts, questions, or any interaction other than a completed handshake.
+
+
 Post Management
 
 The system shall allow users to create new posts for offers and needs
@@ -86,6 +101,8 @@ The system shall mark completed posts as inactive after a successful handshake
 The system shall prevent empty or duplicate posts from being submitted
 
 The system shall allow administrators to remove or hide inappropriate posts
+
+The system shall allow users to specify their available time slots when creating or editing an offer or need post.
 
 Map
 
@@ -126,6 +143,11 @@ The system shall allow administrators to monitor and manage handshake activities
 The system shall display all pre-handshake questions publicly under the related post
 
 The system shall switch the conversation to private mode once a handshake is accepted
+
+The system shall not allow users to ask questions on their own posts.
+
+The system shall allow post owners to publicly answer questions asked on their posts before a handshake is accepted.
+
 
 Timebank
 

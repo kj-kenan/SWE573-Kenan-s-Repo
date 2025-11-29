@@ -26,6 +26,7 @@ import OffersList from "./components/OfferList";
 import TimeBank from "./components/TimeBank";
 import OfferDetail from "./components/OfferDetail";
 import RequestDetail from "./components/RequestDetail";
+import HandshakesList from "./components/HandshakesList";
 
 function Navbar({ onLogout }) {
   const location = useLocation();
@@ -157,10 +158,12 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/profile" element={<ProfileList />} />
+          <Route path="/profile/:userId" element={<ProfileList />} />
           <Route path="/create" element={<CreateService />} />
           <Route path="/offers" element={<OffersList />} />
           <Route path="/offers/:id" element={<OfferDetail />} />
           <Route path="/requests/:id" element={<RequestDetail />} />
+          <Route path="/handshakes" element={<HandshakesList />} />
           <Route path="/settings" element={<h1 className="text-center mt-20 text-3xl">Settings Page</h1>}/>
           <Route path="/timebank" element={<TimeBank/>}/>
         </Routes>

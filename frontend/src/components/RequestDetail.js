@@ -9,6 +9,12 @@ function RequestDetail() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [newQuestion, setNewQuestion] = useState("");
+  const [newMessage, setNewMessage] = useState("");
+  const [showChat, setShowChat] = useState(false);
+  const [answerInputs, setAnswerInputs] = useState({}); // Store answer inputs by question ID
 
   const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL ||
@@ -36,6 +42,21 @@ function RequestDetail() {
       .then((data) => {
         setRequest(data);
         setLoading(false);
+        
+        // Load questions for this request
+        fetch(`${API_BASE_URL}/api/questions/?request=${id}`)
+          .then((res) => {
+            if (!res.ok) {
+              // If not OK, return empty array instead of trying to parse JSON
+              return [];
+            }
+            return res.json();
+          })
+          .then((qData) => setQuestions(Array.isArray(qData) ? qData : []))
+          .catch((err) => {
+            console.error("Error loading questions:", err);
+            setQuestions([]); // Set empty array on error
+          });
       })
       .catch((err) => {
         setError("Failed to load request details.");
@@ -108,6 +129,193 @@ function RequestDetail() {
     }
   };
 
+  const loadMessages = async (handshakeId) => {
+    const token = localStorage.getItem("access");
+    if (!token) return;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/messages/?handshake=${handshakeId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error("Error loading messages:", err);
+    }
+  };
+
+  const handleAskQuestion = async () => {
+    if (!newQuestion.trim()) return;
+
+    const token = localStorage.getItem("access");
+    if (!token) {
+      setMessage("Please log in to ask a question.");
+      return;
+    }
+
+    try {
+      console.log("Posting question to:", `${API_BASE_URL}/api/questions/`);
+      const response = await fetch(`${API_BASE_URL}/api/questions/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          request: parseInt(id),
+          content: newQuestion,
+        }),
+      });
+
+      if (!response.ok) {
+        // Try to parse error response, but handle HTML responses
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          // If response is not JSON (e.g., HTML 404 page), use status text
+          errorData = { error: `Server error: ${response.status} ${response.statusText}` };
+        }
+        setMessage(errorData.detail || errorData.error || `Failed to post question (${response.status})`);
+        return;
+      }
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setNewQuestion("");
+        setMessage("Question posted!");
+        // Reload questions
+        fetch(`${API_BASE_URL}/api/questions/?request=${id}`)
+          .then((res) => {
+            if (!res.ok) return [];
+            return res.json();
+          })
+          .then((qData) => setQuestions(Array.isArray(qData) ? qData : []))
+          .catch((err) => {
+            console.error("Error reloading questions:", err);
+            setQuestions([]);
+          });
+      }
+    } catch (err) {
+      setMessage("Network error. Please try again.");
+      console.error("Error:", err);
+    }
+  };
+
+  const handleAnswerQuestion = async (questionId, answerText) => {
+    if (!answerText.trim()) return;
+
+    const token = localStorage.getItem("access");
+    if (!token) {
+      setMessage("Please log in.");
+      return;
+    }
+
+    try {
+      console.log("Answering question:", questionId);
+      const response = await fetch(`${API_BASE_URL}/api/questions/${questionId}/answer/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          answer: answerText,
+        }),
+      });
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = { error: `Server error: ${response.status} ${response.statusText}` };
+        }
+        setMessage(errorData.error || `Failed to post answer (${response.status})`);
+        return;
+      }
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage("Answer posted!");
+        // Reload questions
+        fetch(`${API_BASE_URL}/api/questions/?request=${id}`)
+          .then((res) => {
+            if (!res.ok) return [];
+            return res.json();
+          })
+          .then((qData) => setQuestions(Array.isArray(qData) ? qData : []))
+          .catch((err) => {
+            console.error("Error reloading questions:", err);
+            setQuestions([]);
+          });
+      }
+    } catch (err) {
+      setMessage("Network error. Please try again.");
+      console.error("Error:", err);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    const currentHandshake = request?.active_handshake;
+    if (!newMessage.trim() || !currentHandshake) return;
+
+    const token = localStorage.getItem("access");
+    if (!token) {
+      setMessage("Please log in.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/messages/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          handshake: currentHandshake.id,
+          content: newMessage,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setNewMessage("");
+        loadMessages(currentHandshake.id);
+      } else {
+        setMessage(data.error || "Failed to send message.");
+      }
+    } catch (err) {
+      setMessage("Network error. Please try again.");
+      console.error("Error:", err);
+    }
+  };
+
+  // Load messages when handshake is accepted and chat is shown
+  useEffect(() => {
+    const currentHandshake = request?.active_handshake;
+    if (showChat && currentHandshake && currentHandshake.status !== "proposed") {
+      loadMessages(currentHandshake.id);
+      // Poll for new messages every 3 seconds
+      const interval = setInterval(() => {
+        loadMessages(currentHandshake.id);
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [showChat, request, API_BASE_URL]);
+
   const handleDeclineHandshake = async (handshakeId) => {
     const token = localStorage.getItem("access");
     if (!token) {
@@ -165,7 +373,8 @@ function RequestDetail() {
     );
   }
 
-  const isOwner = currentUser === request.username;
+  // Check if current user is the owner - handle null/undefined cases
+  const isOwner = Boolean(currentUser && request.username && currentUser === request.username);
   const activeHandshake = request.active_handshake;
   const canSendHandshake =
     !isOwner && !activeHandshake && request.status === "open";
@@ -218,7 +427,30 @@ function RequestDetail() {
               <h3 className="font-semibold text-amber-700 mb-1">Duration</h3>
               <p className="text-gray-700">{request.duration || "Not specified"}</p>
             </div>
-            {request.date && (
+            {request.available_slots && (
+              <div>
+                <h3 className="font-semibold text-amber-700 mb-1">Available Dates & Times</h3>
+                <div className="text-gray-700">
+                  {(() => {
+                    try {
+                      const slots = JSON.parse(request.available_slots);
+                      return (
+                        <ul className="list-disc list-inside space-y-1">
+                          {slots.map((slot, idx) => (
+                            <li key={idx}>
+                              {new Date(slot.date).toLocaleDateString()} at {slot.time}
+                            </li>
+                          ))}
+                        </ul>
+                      );
+                    } catch (e) {
+                      return <p>{request.available_slots}</p>;
+                    }
+                  })()}
+                </div>
+              </div>
+            )}
+            {!request.available_slots && request.date && (
               <div>
                 <h3 className="font-semibold text-amber-700 mb-1">Date</h3>
                 <p className="text-gray-700">
@@ -254,11 +486,12 @@ function RequestDetail() {
                   Active Handshake ({activeHandshake.status})
                 </p>
                 <p className="text-sm text-gray-600 mb-2">
-                  Seeker: {activeHandshake.seeker_username}
+                  Seeker: {activeHandshake.seeker_username || "Anonymous"}
                 </p>
                 <p className="text-sm text-gray-600 mb-2">
                   Hours: {activeHandshake.hours}
                 </p>
+                {/* Show accept/decline buttons for owner when handshake is proposed */}
                 {isOwner && activeHandshake.status === "proposed" && (
                   <div className="flex gap-2 mt-4">
                     <button
@@ -274,6 +507,15 @@ function RequestDetail() {
                       Decline Handshake
                     </button>
                   </div>
+                )}
+                {/* Show chat button if handshake is accepted */}
+                {activeHandshake.status !== "proposed" && (
+                  <button
+                    onClick={() => setShowChat(!showChat)}
+                    className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    {showChat ? "Hide Chat" : "Open Chat"}
+                  </button>
                 )}
               </div>
             ) : (
@@ -301,6 +543,170 @@ function RequestDetail() {
               </p>
             )}
           </div>
+
+          {/* Public Questions Section */}
+          <div className="border-t pt-6 mt-6">
+            <h2 className="text-2xl font-semibold text-amber-700 mb-4">
+              Questions & Answers
+            </h2>
+
+            {questions.length === 0 ? (
+              <p className="text-gray-600 mb-4">
+                {isOwner 
+                  ? "No questions yet. When users ask questions, you can answer them here."
+                  : "No questions yet. Be the first to ask!"}
+              </p>
+            ) : (
+              <div className="space-y-4 mb-4">
+                {questions.map((q) => (
+                  <div key={q.id} className="bg-gray-50 p-4 rounded-lg">
+                    <p className="font-semibold text-sm text-gray-600 mb-1">
+                      {q.author_username} asked:
+                    </p>
+                    <p className="text-gray-800 mb-2">{q.content}</p>
+                    {q.answer ? (
+                      <div className="mt-3 p-3 bg-amber-50 border-l-4 border-amber-500 rounded">
+                        <p className="font-semibold text-sm text-amber-700 mb-1">
+                          {request.username} answered:
+                        </p>
+                        <p className="text-gray-800">{q.answer}</p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {new Date(q.answered_at).toLocaleString()}
+                        </p>
+                      </div>
+                    ) : isOwner && (!activeHandshake || activeHandshake.status === "proposed") ? (
+                      <div className="mt-3">
+                        <textarea
+                          placeholder="Answer this question..."
+                          className="w-full p-2 border rounded text-sm"
+                          rows={2}
+                          value={answerInputs[q.id] || ""}
+                          onChange={(e) => {
+                            setAnswerInputs({ ...answerInputs, [q.id]: e.target.value });
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && e.ctrlKey) {
+                              handleAnswerQuestion(q.id, answerInputs[q.id] || "");
+                              setAnswerInputs({ ...answerInputs, [q.id]: "" });
+                            }
+                          }}
+                        />
+                        <button
+                          onClick={() => {
+                            const answerText = answerInputs[q.id] || "";
+                            if (answerText.trim()) {
+                              handleAnswerQuestion(q.id, answerText);
+                              setAnswerInputs({ ...answerInputs, [q.id]: "" });
+                            }
+                          }}
+                          className="mt-2 px-3 py-1 bg-amber-500 text-white text-sm rounded hover:bg-amber-600"
+                        >
+                          Post Answer
+                        </button>
+                      </div>
+                    ) : null}
+                    <p className="text-xs text-gray-500 mt-2">
+                      Asked: {new Date(q.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Allow questions if: not owner, logged in, and handshake is not accepted/in_progress (can ask even if proposed) */}
+            {/* Owners should NEVER see the question form - they can only answer */}
+            {!isOwner && currentUser && (!activeHandshake || activeHandshake.status === "proposed") && (
+              <div className="mt-4">
+                <textarea
+                  value={newQuestion}
+                  onChange={(e) => setNewQuestion(e.target.value)}
+                  placeholder="Ask a question about this request..."
+                  className="w-full p-3 border rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  rows={3}
+                />
+                <button
+                  onClick={handleAskQuestion}
+                  className="px-4 py-2 bg-amber-500 text-white rounded hover:bg-amber-600"
+                >
+                  Post Question
+                </button>
+              </div>
+            )}
+            {/* Show login prompt only for non-owners */}
+            {!isOwner && !currentUser && (!activeHandshake || activeHandshake.status === "proposed") && (
+              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-gray-600">
+                  Please <a href="/login" className="text-amber-600 hover:underline font-semibold">log in</a> to ask a question.
+                </p>
+              </div>
+            )}
+            {/* Show message for owners */}
+            {isOwner && questions.length === 0 && (
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-gray-600">
+                  No questions yet. When users ask questions, you can answer them here.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Private Chat Section (after handshake accepted) */}
+          {showChat && activeHandshake && activeHandshake.status !== "proposed" && (
+            <div className="border-t pt-6 mt-6">
+              <h2 className="text-2xl font-semibold text-amber-700 mb-4">
+                Private Chat
+              </h2>
+
+              <div className="bg-gray-50 p-4 rounded-lg mb-4" style={{ maxHeight: "400px", overflowY: "auto" }}>
+                {messages.length === 0 ? (
+                  <p className="text-gray-600">No messages yet. Start the conversation!</p>
+                ) : (
+                  <div className="space-y-3">
+                    {messages.map((msg) => {
+                      const isMyMessage = msg.sender_username === currentUser;
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`p-3 rounded-lg ${
+                            isMyMessage
+                              ? "bg-amber-500 text-white ml-auto max-w-[80%]"
+                              : "bg-white text-gray-800 max-w-[80%]"
+                          }`}
+                        >
+                          <p className="text-xs opacity-75 mb-1">{msg.sender_username}</p>
+                          <p>{msg.content}</p>
+                          <p className="text-xs opacity-75 mt-1">
+                            {new Date(msg.created_at).toLocaleTimeString()}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      handleSendMessage();
+                    }
+                  }}
+                  placeholder="Type a message..."
+                  className="flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+                <button
+                  onClick={handleSendMessage}
+                  className="px-6 py-3 bg-amber-500 text-white rounded-lg hover:bg-amber-600"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

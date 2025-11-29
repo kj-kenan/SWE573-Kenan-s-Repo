@@ -9,12 +9,12 @@ function CreateService() {
     description: "",
     category: "",
     duration: "",
-    date: "",
     latitude: "",
     longitude: "",
   });
 
   const [selectedTags, setSelectedTags] = useState([]);
+  const [availableSlots, setAvailableSlots] = useState([]);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
@@ -72,9 +72,15 @@ function CreateService() {
 
     // Remove category field as it doesn't exist in the model
     const { category, ...formDataWithoutCategory } = formData;
+    // Format available slots as JSON array for backend
+    const validSlots = availableSlots
+      .filter((slot) => slot.date && slot.time)
+      .map((slot) => ({ date: slot.date, time: slot.time }));
+
     const payload = {
       ...formDataWithoutCategory,
       tags: selectedTags.join(", "),
+      available_slots: validSlots.length > 0 ? JSON.stringify(validSlots) : null,
     };
 
     try {
@@ -98,11 +104,11 @@ function CreateService() {
           description: "",
           category: "",
           duration: "",
-          date: "",
           latitude: "",
           longitude: "",
         });
         setSelectedTags([]);
+        setAvailableSlots([]);
       } else {
         setIsError(true);
         setMessage(data.detail || data.error || "Something went wrong.");
@@ -189,13 +195,54 @@ function CreateService() {
               className="block w-full mb-3 p-3 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
 
-            <input
-              type="date"
-              name="date"
-              value={formData.date}
-              onChange={handleChange}
-              className="block w-full mb-3 p-3 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
-            />
+            {/* Available Dates and Times */}
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-amber-700 mb-2">
+                Available Dates and Times
+              </label>
+              {availableSlots.map((slot, index) => (
+                <div key={index} className="flex gap-2 mb-2">
+                  <input
+                    type="date"
+                    value={slot.date}
+                    onChange={(e) => {
+                      const newSlots = [...availableSlots];
+                      newSlots[index].date = e.target.value;
+                      setAvailableSlots(newSlots);
+                    }}
+                    className="flex-1 p-2 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                  <input
+                    type="time"
+                    value={slot.time}
+                    onChange={(e) => {
+                      const newSlots = [...availableSlots];
+                      newSlots[index].time = e.target.value;
+                      setAvailableSlots(newSlots);
+                    }}
+                    className="flex-1 p-2 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAvailableSlots(availableSlots.filter((_, i) => i !== index));
+                    }}
+                    className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setAvailableSlots([...availableSlots, { date: "", time: "" }]);
+                }}
+                className="w-full py-2 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded font-semibold text-amber-700"
+              >
+                + Add Date & Time Slot
+              </button>
+            </div>
 
             <TagSelector
               selectedTags={selectedTags}

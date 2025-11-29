@@ -24,6 +24,9 @@ function Home() {
       }
 
       try {
+        console.log("Sending handshake to:", `${API_BASE_URL}/api/handshakes/`);
+        console.log("Offer ID:", offerId);
+        
         const response = await fetch(`${API_BASE_URL}/api/handshakes/`, {
           method: "POST",
           headers: {
@@ -33,13 +36,37 @@ function Home() {
           body: JSON.stringify({ offer: offerId, hours: 1 }),
         });
 
+        console.log("Response status:", response.status);
+        
         if (response.ok) {
           alert("Handshake request sent successfully.");
+          // Reload to update map
+          window.location.reload();
         } else {
           const err = await response.json();
-          alert("Error: " + (err.detail || err.error || "Request failed"));
+          console.error("Error response:", err);
+          
+          // Handle different error formats
+          let errorMsg = "Request failed";
+          if (err.detail) {
+            errorMsg = err.detail;
+          } else if (err.error) {
+            errorMsg = err.error;
+          } else if (Array.isArray(err.non_field_errors)) {
+            errorMsg = err.non_field_errors.join(", ");
+          } else if (typeof err === "object") {
+            // Try to get first error message
+            const firstError = Object.values(err)[0];
+            if (Array.isArray(firstError)) {
+              errorMsg = firstError[0];
+            } else if (typeof firstError === "string") {
+              errorMsg = firstError;
+            }
+          }
+          alert("Error: " + errorMsg);
         }
       } catch (err) {
+        console.error("Network error:", err);
         alert("Network error: " + err.message);
       }
     },
