@@ -22,10 +22,20 @@ function OffersList() {
     if (token) {
       try {
         const decoded = JSON.parse(atob(token.split(".")[1]));
-        setCurrentUser(decoded.username || decoded.user_id);
+        // Always use username (string) for consistency with backend
+        const username = decoded.username;
+        if (username) {
+          setCurrentUser(username);
+        } else {
+          console.warn("JWT token does not contain 'username' field. Cannot filter user's posts.");
+          setCurrentUser(null);
+        }
       } catch (e) {
         console.error("Error decoding token:", e);
+        setCurrentUser(null);
       }
+    } else {
+      setCurrentUser(null);
     }
 
     const fetchData = async () => {
@@ -61,8 +71,13 @@ function OffersList() {
   let currentList = activeTab === "offers" ? offers : requests;
   
   // If "My Offers" sub-tab is active, filter to show only current user's posts
-  if (activeSubTab === "my" && currentUser) {
-    currentList = currentList.filter((item) => item.username === currentUser);
+  // Compare usernames as strings (case-insensitive) for reliability
+  if (activeSubTab === "my" && currentUser && typeof currentUser === 'string') {
+    currentList = currentList.filter((item) => 
+      item.username && 
+      typeof item.username === 'string' &&
+      item.username.toLowerCase().trim() === currentUser.toLowerCase().trim()
+    );
   }
 
   return (

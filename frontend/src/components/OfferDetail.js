@@ -25,10 +25,46 @@ function OfferDetail() {
     if (token) {
       try {
         const decoded = JSON.parse(atob(token.split(".")[1]));
-        setCurrentUser(decoded.username || decoded.user_id);
+        // JWT tokens from simplejwt may contain 'username' or we may need to fetch it
+        // Try username first, then user_id as fallback (but we'll fetch username from backend if needed)
+        const username = decoded.username;
+        if (username) {
+          setCurrentUser(username);
+        } else {
+          // Token exists but no username - fetch username from backend profile
+          console.warn("JWT token does not contain 'username' field. Fetching from backend...");
+          fetch(`${API_BASE_URL}/api/profiles/me/`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+            .then((res) => {
+              if (res.ok) {
+                return res.json();
+              }
+              throw new Error("Failed to fetch profile");
+            })
+            .then((profile) => {
+              if (profile && profile.username) {
+                setCurrentUser(profile.username);
+              } else {
+                console.error("Profile does not contain username");
+                setCurrentUser(null);
+              }
+            })
+            .catch((err) => {
+              console.error("Error fetching profile:", err);
+              // If we can't get username, we can't detect ownership but user is still logged in
+              // Use a placeholder to indicate logged in status
+              setCurrentUser("__LOGGED_IN__");
+            });
+        }
       } catch (e) {
         console.error("Error decoding token:", e);
+        setCurrentUser(null);
       }
+    } else {
+      setCurrentUser(null);
     }
 
     // Fetch offer details
@@ -235,11 +271,14 @@ function OfferDetail() {
   };
 
   const handleAnswerQuestion = async (questionId, answerText) => {
-    if (!answerText.trim()) return;
+    if (!answerText.trim()) {
+      setMessage("Please enter an answer before submitting.");
+      return;
+    }
 
     const token = localStorage.getItem("access");
     if (!token) {
-      setMessage("Please log in.");
+      setMessage("Please log in to answer questions.");
       return;
     }
 
@@ -252,7 +291,7 @@ function OfferDetail() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          answer: answerText,
+          answer: answerText.trim(),
         }),
       });
 
@@ -263,29 +302,43 @@ function OfferDetail() {
         } catch (e) {
           errorData = { error: `Server error: ${response.status} ${response.statusText}` };
         }
-        setMessage(errorData.error || `Failed to post answer (${response.status})`);
+        const errorMsg = errorData.error || errorData.detail || `Failed to post answer (${response.status})`;
+        setMessage(errorMsg);
+        setTimeout(() => setMessage(""), 5000);
         return;
       }
 
       const data = await response.json();
 
       if (response.ok) {
-        setMessage("Answer posted!");
-        // Reload questions
+        setMessage("Answer posted successfully!");
+        setTimeout(() => setMessage(""), 3000);
+        
+        // Clear the answer input for this question
+        setAnswerInputs({ ...answerInputs, [questionId]: "" });
+        
+        // Reload questions to show the new answer
         fetch(`${API_BASE_URL}/api/questions/?offer=${id}`)
           .then((res) => {
-            if (!res.ok) return [];
+            if (!res.ok) {
+              console.error("Failed to reload questions:", res.status);
+              return [];
+            }
             return res.json();
           })
-          .then((qData) => setQuestions(Array.isArray(qData) ? qData : []))
+          .then((qData) => {
+            setQuestions(Array.isArray(qData) ? qData : []);
+          })
           .catch((err) => {
             console.error("Error reloading questions:", err);
-            setQuestions([]);
+            // Still try to reload the page as fallback
+            window.location.reload();
           });
       }
     } catch (err) {
-      setMessage("Network error. Please try again.");
+      setMessage("Network error. Please check your connection and try again.");
       console.error("Error:", err);
+      setTimeout(() => setMessage(""), 5000);
     }
   };
 
@@ -396,11 +449,39 @@ function OfferDetail() {
     );
   }
 
+  // Check if user is logged in (has token, even if username not yet loaded)
+  const isLoggedIn = Boolean(localStorage.getItem("access"));
+  
   // Check if current user is the owner - handle null/undefined cases
-  const isOwner = Boolean(currentUser && offer.username && currentUser === offer.username);
+  // Compare usernames (case-insensitive for safety, but both must be strings)
+  const isOwner = Boolean(
+    currentUser && 
+    typeof currentUser === 'string' &&
+    offer.username && 
+    typeof offer.username === 'string' &&
+    currentUser.toLowerCase().trim() === offer.username.toLowerCase().trim()
+  );
   const activeHandshake = offer.active_handshake;
-  const canSendHandshake =
-    !isOwner && !activeHandshake && offer.status === "open";
+  // Handshake button: only show if NOT owner, user is logged in, no active handshake, and offer is open
+  const canSendHandshake = Boolean(
+    isLoggedIn && 
+    !isOwner && 
+    !activeHandshake && 
+    offer.status === "open"
+  );
+  
+  // Debug logging (remove in production)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Ownership check:', {
+      currentUser,
+      currentUserType: typeof currentUser,
+      offerUsername: offer.username,
+      offerUsernameType: typeof offer.username,
+      isOwner,
+      canSendHandshake,
+      activeHandshake: activeHandshake?.status
+    });
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-yellow-100 to-amber-200 py-10">
@@ -594,40 +675,52 @@ function OfferDetail() {
                         </p>
                         <p className="text-gray-800">{q.answer}</p>
                         <p className="text-xs text-gray-500 mt-2">
-                          {new Date(q.answered_at).toLocaleString()}
+                          {q.answered_at ? new Date(q.answered_at).toLocaleString() : ''}
                         </p>
                       </div>
-                    ) : isOwner && (!activeHandshake || activeHandshake.status === "proposed") ? (
-                      <div className="mt-3">
-                        <textarea
-                          placeholder="Answer this question..."
-                          className="w-full p-2 border rounded text-sm"
-                          rows={2}
-                          value={answerInputs[q.id] || ""}
-                          onChange={(e) => {
-                            setAnswerInputs({ ...answerInputs, [q.id]: e.target.value });
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && e.ctrlKey) {
-                              handleAnswerQuestion(q.id, answerInputs[q.id] || "");
-                              setAnswerInputs({ ...answerInputs, [q.id]: "" });
-                            }
-                          }}
-                        />
-                        <button
-                          onClick={() => {
-                            const answerText = answerInputs[q.id] || "";
-                            if (answerText.trim()) {
-                              handleAnswerQuestion(q.id, answerText);
-                              setAnswerInputs({ ...answerInputs, [q.id]: "" });
-                            }
-                          }}
-                          className="mt-2 px-3 py-1 bg-amber-500 text-white text-sm rounded hover:bg-amber-600"
-                        >
-                          Post Answer
-                        </button>
-                      </div>
-                    ) : null}
+                    ) : (
+                      // Show answer UI for owners if question is unanswered
+                      // Only allow answering before handshake is accepted (backend enforces this)
+                      isOwner && (!activeHandshake || activeHandshake.status === "proposed") && (
+                        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-sm font-semibold text-blue-700 mb-2">
+                            💬 Answer this question:
+                          </p>
+                          <textarea
+                            placeholder="Write your answer here..."
+                            className="w-full p-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                            rows={3}
+                            value={answerInputs[q.id] || ""}
+                            onChange={(e) => {
+                              setAnswerInputs({ ...answerInputs, [q.id]: e.target.value });
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && e.ctrlKey) {
+                                const answerText = answerInputs[q.id] || "";
+                                if (answerText.trim()) {
+                                  handleAnswerQuestion(q.id, answerText);
+                                  setAnswerInputs({ ...answerInputs, [q.id]: "" });
+                                }
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={() => {
+                              const answerText = answerInputs[q.id] || "";
+                              if (answerText.trim()) {
+                                handleAnswerQuestion(q.id, answerText);
+                                setAnswerInputs({ ...answerInputs, [q.id]: "" });
+                              } else {
+                                setMessage("Please enter an answer before submitting.");
+                              }
+                            }}
+                            className="mt-2 px-4 py-2 bg-amber-500 text-white text-sm rounded hover:bg-amber-600 font-semibold"
+                          >
+                            Post Answer
+                          </button>
+                        </div>
+                      )
+                    )}
                     <p className="text-xs text-gray-500 mt-2">
                       Asked: {new Date(q.created_at).toLocaleString()}
                     </p>
@@ -636,38 +729,51 @@ function OfferDetail() {
               </div>
             )}
 
-            {/* Allow questions if: not owner, logged in, and handshake is not accepted/in_progress (can ask even if proposed) */}
+            {/* Question Form - ONLY for non-owners */}
             {/* Owners should NEVER see the question form - they can only answer */}
-            {!isOwner && currentUser && (!activeHandshake || activeHandshake.status === "proposed") && (
-              <div className="mt-4">
-                <textarea
-                  value={newQuestion}
-                  onChange={(e) => setNewQuestion(e.target.value)}
-                  placeholder="Ask a question about this offer..."
-                  className="w-full p-3 border rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                  rows={3}
-                />
-                <button
-                  onClick={handleAskQuestion}
-                  className="px-4 py-2 bg-amber-500 text-white rounded hover:bg-amber-600"
-                >
-                  Post Question
-                </button>
-              </div>
+            {!isOwner && (
+              <>
+                {isLoggedIn && (!activeHandshake || activeHandshake.status === "proposed") && (
+                  <div className="mt-4 p-4 bg-white border border-gray-200 rounded-lg">
+                    <h3 className="text-lg font-semibold text-amber-700 mb-2">Ask a Question</h3>
+                    <textarea
+                      value={newQuestion}
+                      onChange={(e) => setNewQuestion(e.target.value)}
+                      placeholder="Ask a question about this offer..."
+                      className="w-full p-3 border rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      rows={3}
+                    />
+                    <button
+                      onClick={handleAskQuestion}
+                      className="px-4 py-2 bg-amber-500 text-white rounded hover:bg-amber-600 font-semibold"
+                    >
+                      Post Question
+                    </button>
+                  </div>
+                )}
+                {/* Show login prompt only for non-owners who are not logged in */}
+                {!isLoggedIn && (!activeHandshake || activeHandshake.status === "proposed") && (
+                  <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-gray-600">
+                      Please <a href="/login" className="text-amber-600 hover:underline font-semibold">log in</a> to ask a question.
+                    </p>
+                  </div>
+                )}
+              </>
             )}
-            {/* Show login prompt only for non-owners */}
-            {!isOwner && !currentUser && (!activeHandshake || activeHandshake.status === "proposed") && (
-              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-gray-600">
-                  Please <a href="/login" className="text-amber-600 hover:underline font-semibold">log in</a> to ask a question.
-                </p>
-              </div>
-            )}
-            {/* Show message for owners */}
+            {/* Show helpful message for owners when there are no questions */}
             {isOwner && questions.length === 0 && (
               <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-gray-600">
                   No questions yet. When users ask questions, you can answer them here.
+                </p>
+              </div>
+            )}
+            {/* Show helpful message for owners when handshake is already accepted (can't answer anymore) */}
+            {isOwner && questions.length > 0 && activeHandshake && activeHandshake.status !== "proposed" && (
+              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-gray-600">
+                  Note: Questions can only be answered before a handshake is accepted. New questions can still be asked by other users.
                 </p>
               </div>
             )}

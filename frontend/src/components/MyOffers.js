@@ -34,11 +34,23 @@ function MyOffers() {
       .then((data) => {
         // Decode JWT to get the username of the logged-in user
         const decoded = JSON.parse(atob(token.split(".")[1]));
-        const username = decoded.username || decoded.user_id || "";
+        // Always use username (string) for consistency with backend
+        const username = decoded.username;
+        
+        if (!username) {
+          console.error("JWT token does not contain 'username' field. Cannot filter offers.");
+          setError("Unable to identify user. Please log in again.");
+          setOffers([]);
+          return;
+        }
 
-        // Filter only the offers created by this user (compare username)
+        // Filter only the offers created by this user (compare username as strings, case-insensitive)
         const myOffers = Array.isArray(data)
-          ? data.filter((offer) => offer.username === username)
+          ? data.filter((offer) => 
+              offer.username && 
+              typeof offer.username === 'string' &&
+              offer.username.toLowerCase().trim() === username.toLowerCase().trim()
+            )
           : [];
         setOffers(myOffers);
       })

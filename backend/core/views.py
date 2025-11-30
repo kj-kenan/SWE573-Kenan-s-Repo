@@ -120,13 +120,22 @@ def profile_detail(request, user_id=None):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(["GET"])
+@api_view(["GET", "PUT", "PATCH"])
 @permission_classes([IsAuthenticated])
 def profile_own(request):
-    """Get current user's own profile"""
+    """Get or update current user's own profile"""
     profile, created = UserProfile.objects.get_or_create(user=request.user)
-    serializer = UserProfileSerializer(profile, context={"request": request})
-    return Response(serializer.data)
+    
+    if request.method == "GET":
+        serializer = UserProfileSerializer(profile, context={"request": request})
+        return Response(serializer.data)
+    
+    # PUT/PATCH - update own profile
+    serializer = UserProfileSerializer(profile, data=request.data, partial=True, context={"request": request})
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ---------------------------------------------------------------------------

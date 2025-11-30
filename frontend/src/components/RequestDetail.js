@@ -25,10 +25,23 @@ function RequestDetail() {
     if (token) {
       try {
         const decoded = JSON.parse(atob(token.split(".")[1]));
-        setCurrentUser(decoded.username || decoded.user_id);
+        // Always use username (string) for consistency with backend
+        // Backend returns username as string, so we must compare strings
+        const username = decoded.username;
+        if (username) {
+          setCurrentUser(username);
+        } else {
+          console.warn("JWT token does not contain 'username' field. Using user_id as fallback.");
+          // If username is not available, we can't reliably detect ownership
+          // Set to null to prevent false ownership detection
+          setCurrentUser(null);
+        }
       } catch (e) {
         console.error("Error decoding token:", e);
+        setCurrentUser(null);
       }
+    } else {
+      setCurrentUser(null);
     }
 
     // Fetch request details
@@ -374,10 +387,23 @@ function RequestDetail() {
   }
 
   // Check if current user is the owner - handle null/undefined cases
-  const isOwner = Boolean(currentUser && request.username && currentUser === request.username);
+  // Check if current user is the owner - handle null/undefined cases
+  // Compare usernames (case-insensitive for safety, but both must be strings)
+  const isOwner = Boolean(
+    currentUser && 
+    typeof currentUser === 'string' &&
+    request.username && 
+    typeof request.username === 'string' &&
+    currentUser.toLowerCase().trim() === request.username.toLowerCase().trim()
+  );
   const activeHandshake = request.active_handshake;
-  const canSendHandshake =
-    !isOwner && !activeHandshake && request.status === "open";
+  // Handshake button: only show if NOT owner, user is logged in, no active handshake, and request is open
+  const canSendHandshake = Boolean(
+    currentUser && 
+    !isOwner && 
+    !activeHandshake && 
+    request.status === "open"
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-yellow-100 to-amber-200 py-10">

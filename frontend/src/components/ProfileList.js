@@ -19,8 +19,11 @@ function ProfileList() {
     province: "",
     district: "",
   });
+  const [profilePictureFile, setProfilePictureFile] = useState(null);
+  const [profilePicturePreview, setProfilePicturePreview] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL ||
@@ -29,12 +32,15 @@ function ProfileList() {
   useEffect(() => {
     const token = localStorage.getItem("access");
     if (token) {
+      setIsAuthenticated(true);
       try {
         const decoded = JSON.parse(atob(token.split(".")[1]));
-        setCurrentUser(decoded.username || decoded.user_id);
+        setCurrentUser(decoded.username || decoded.user_id || decoded.user_id?.toString());
       } catch (e) {
         console.error("Error decoding token:", e);
       }
+    } else {
+      setIsAuthenticated(false);
     }
 
     loadProfile();
@@ -62,7 +68,10 @@ function ProfileList() {
 
       const profileData = await (await fetch(profileUrl, { headers })).json();
       setProfile(profileData);
-      setIsOwnProfile(!userId && currentUser === profileData.username);
+      // If no userId, we're viewing own profile (via /profile route)
+      // Also check if username matches or if we successfully loaded /api/profiles/me/
+      const viewingOwnProfile = !userId && (token ? true : false);
+      setIsOwnProfile(viewingOwnProfile);
 
       // Set edit form
       setEditForm({
@@ -72,6 +81,10 @@ function ProfileList() {
         province: profileData.province || "",
         district: profileData.district || "",
       });
+      
+      // Reset profile picture preview
+      setProfilePicturePreview(null);
+      setProfilePictureFile(null);
 
       // Get ratings and badges for this user
       const [ratingsRes, badgesRes, offersRes, requestsRes] = await Promise.all([
@@ -115,6 +128,29 @@ function ProfileList() {
     }
   };
 
+  const handleProfilePictureChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setMessage("Please select an image file.");
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setMessage("Image size must be less than 5MB.");
+        return;
+      }
+      setProfilePictureFile(file);
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfilePicturePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleEditProfile = async () => {
     const token = localStorage.getItem("access");
     if (!token) {
@@ -123,13 +159,26 @@ function ProfileList() {
     }
 
     try {
+      // Use FormData to support file uploads
+      const formData = new FormData();
+      formData.append("bio", editForm.bio);
+      formData.append("skills", editForm.skills);
+      formData.append("interests", editForm.interests);
+      formData.append("province", editForm.province);
+      formData.append("district", editForm.district);
+      
+      // Add profile picture if selected
+      if (profilePictureFile) {
+        formData.append("profile_picture", profilePictureFile);
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/profiles/me/`, {
         method: "PATCH",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          // Don't set Content-Type header - browser will set it with boundary for FormData
         },
-        body: JSON.stringify(editForm),
+        body: formData,
       });
 
       if (!response.ok) {
@@ -140,6 +189,8 @@ function ProfileList() {
       const updatedProfile = await response.json();
       setProfile(updatedProfile);
       setIsEditing(false);
+      setProfilePictureFile(null);
+      setProfilePicturePreview(null);
       setMessage("Profile updated successfully!");
       setTimeout(() => setMessage(""), 3000);
     } catch (err) {
@@ -190,7 +241,9 @@ function ProfileList() {
     );
   }
 
-  const isOwner = !userId && currentUser === profile.username;
+  // If no userId in URL, we're viewing own profile (via /profile route)
+  // Show edit button if authenticated and viewing own profile
+  const isOwner = !userId && isAuthenticated;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-yellow-100 to-amber-200 py-10">
@@ -208,15 +261,44 @@ function ProfileList() {
         <div className="bg-white rounded-2xl shadow-lg p-8">
           {/* Profile Header */}
           <div className="flex items-start gap-6 mb-6">
-            <div className="flex-shrink-0">
-              {profile.profile_picture_url ? (
+            <div className="flex-shrink-0 relative">
+              {isEditing && isOwner && (
+                <>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfilePictureChange}
+                    className="hidden"
+                    id="profile-picture-input"
+                  />
+                  <label
+                    htmlFor="profile-picture-input"
+                    className="absolute inset-0 cursor-pointer rounded-full flex items-center justify-center bg-black bg-opacity-50 opacity-0 hover:opacity-100 transition-opacity z-10 group"
+                    title="Click to upload profile picture"
+                  >
+                    <span className="text-white text-sm font-semibold">📷 Upload</span>
+                  </label>
+                </>
+              )}
+              {profilePicturePreview ? (
+                <img
+                  src={profilePicturePreview}
+                  alt={profile.username}
+                  className={`w-32 h-32 rounded-full object-cover border-4 border-amber-400 ${isEditing && isOwner ? 'cursor-pointer' : ''}`}
+                  onClick={isEditing && isOwner ? () => document.getElementById('profile-picture-input').click() : undefined}
+                />
+              ) : profile.profile_picture_url ? (
                 <img
                   src={profile.profile_picture_url}
                   alt={profile.username}
-                  className="w-32 h-32 rounded-full object-cover border-4 border-amber-400"
+                  className={`w-32 h-32 rounded-full object-cover border-4 border-amber-400 ${isEditing && isOwner ? 'cursor-pointer' : ''}`}
+                  onClick={isEditing && isOwner ? () => document.getElementById('profile-picture-input').click() : undefined}
                 />
               ) : (
-                <div className="w-32 h-32 rounded-full bg-amber-400 flex items-center justify-center text-4xl font-bold text-white">
+                <div 
+                  className={`w-32 h-32 rounded-full bg-amber-400 flex items-center justify-center text-4xl font-bold text-white ${isEditing && isOwner ? 'cursor-pointer hover:bg-amber-500 transition-colors' : ''}`}
+                  onClick={isEditing && isOwner ? () => document.getElementById('profile-picture-input').click() : undefined}
+                >
                   {profile.username?.[0]?.toUpperCase() || "U"}
                 </div>
               )}
@@ -272,6 +354,8 @@ function ProfileList() {
                             province: profile.province || "",
                             district: profile.district || "",
                           });
+                          setProfilePictureFile(null);
+                          setProfilePicturePreview(null);
                         }}
                         className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
                       >
