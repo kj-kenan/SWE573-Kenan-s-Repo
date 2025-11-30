@@ -30,6 +30,8 @@ import HandshakesList from "./components/HandshakesList";
 
 function Navbar({ onLogout }) {
   const location = useLocation();
+  const [showOffersMenu, setShowOffersMenu] = React.useState(false);
+  const isLoggedIn = Boolean(localStorage.getItem("access"));
 
   if (
     location.pathname === "/" ||
@@ -68,18 +70,62 @@ function Navbar({ onLogout }) {
           <span>Home</span>
         </Link>
 
-        <Link
-          to="/offers"
-          className="hover:text-amber-800 flex items-center gap-1 transition-colors"
-        >
-          <img
-            src={offersIcon}
-            alt="Offers"
-            className="w-6 h-6"
-            style={{ filter: "invert(12%) sepia(15%) saturate(900%) hue-rotate(10deg) brightness(60%) contrast(90%)" }}
-          />
-          <span>Offers & Needs</span>
-        </Link>
+        {/* Offers & Requests Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowOffersMenu(!showOffersMenu)}
+            className="hover:text-amber-800 flex items-center gap-1 transition-colors"
+            onBlur={() => setTimeout(() => setShowOffersMenu(false), 200)}
+          >
+            <img
+              src={offersIcon}
+              alt="Offers"
+              className="w-6 h-6"
+              style={{ filter: "invert(12%) sepia(15%) saturate(900%) hue-rotate(10deg) brightness(60%) contrast(90%)" }}
+            />
+            <span>Offers & Requests</span>
+            <span className="text-xs ml-1">▼</span>
+          </button>
+          {/* Dropdown Menu */}
+          {showOffersMenu && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 border border-amber-200">
+              <div className="py-2">
+                <Link
+                  to="/offers/all"
+                  onClick={() => setShowOffersMenu(false)}
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700"
+                >
+                  All Offers
+                </Link>
+                {isLoggedIn && (
+                  <Link
+                    to="/offers/my"
+                    onClick={() => setShowOffersMenu(false)}
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700"
+                  >
+                    My Offers
+                  </Link>
+                )}
+                <Link
+                  to="/requests/all"
+                  onClick={() => setShowOffersMenu(false)}
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700 border-t border-amber-100"
+                >
+                  All Requests
+                </Link>
+                {isLoggedIn && (
+                  <Link
+                    to="/requests/my"
+                    onClick={() => setShowOffersMenu(false)}
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700"
+                  >
+                    My Requests
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         <Link
           to="/timebank"
@@ -160,7 +206,11 @@ function App() {
           <Route path="/profile" element={<ProfileList />} />
           <Route path="/profile/:userId" element={<ProfileList />} />
           <Route path="/create" element={<CreateService />} />
-          <Route path="/offers" element={<OffersList />} />
+          <Route path="/offers" element={<OffersList defaultTab="offers" defaultSubTab="all" />} />
+          <Route path="/offers/all" element={<OffersList defaultTab="offers" defaultSubTab="all" />} />
+          <Route path="/offers/my" element={<OffersList defaultTab="offers" defaultSubTab="my" />} />
+          <Route path="/requests/all" element={<OffersList defaultTab="requests" defaultSubTab="all" />} />
+          <Route path="/requests/my" element={<OffersList defaultTab="requests" defaultSubTab="my" />} />
           <Route path="/offers/:id" element={<OfferDetail />} />
           <Route path="/requests/:id" element={<RequestDetail />} />
           <Route path="/handshakes" element={<HandshakesList />} />

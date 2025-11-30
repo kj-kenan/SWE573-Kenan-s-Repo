@@ -237,6 +237,8 @@ class HandshakeSerializer(serializers.ModelSerializer):
 class TransactionSerializer(serializers.ModelSerializer):
     sender_username = serializers.CharField(source="sender.username", read_only=True)
     receiver_username = serializers.CharField(source="receiver.username", read_only=True)
+    related_post_title = serializers.SerializerMethodField()
+    transaction_type = serializers.SerializerMethodField()
 
     class Meta:
         model = Transaction
@@ -249,7 +251,27 @@ class TransactionSerializer(serializers.ModelSerializer):
             "receiver_username",
             "amount",
             "created_at",
+            "related_post_title",
+            "transaction_type",
         ]
+
+    def get_related_post_title(self, obj):
+        """Get the title of the related offer or request"""
+        if obj.handshake.offer:
+            return obj.handshake.offer.title
+        elif obj.handshake.request:
+            return obj.handshake.request.title
+        return None
+
+    def get_transaction_type(self, obj):
+        """Determine if this is an earned or spent transaction for the current user"""
+        request = self.context.get("request")
+        if request and request.user:
+            if obj.receiver == request.user:
+                return "earned"
+            elif obj.sender == request.user:
+                return "spent"
+        return None
 
 
 # ---------------------------------------------------------------------------

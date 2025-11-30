@@ -8,4 +8,8 @@ from .models import UserProfile
 def create_user_profile(sender, instance, created, **kwargs):
     """Automatically create a UserProfile when a new User is created."""
     if created:
-        UserProfile.objects.create(user=instance)
+        # Create profile with starting balance of 3 Beellars
+        UserProfile.objects.get_or_create(
+            user=instance,
+            defaults={'timebank_balance': 3}
+        )

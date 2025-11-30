@@ -53,7 +53,16 @@ def register_user(request):
 
     user = User.objects.create_user(username=username, password=password, email=email)
     user.save()
-    UserProfile.objects.create(user=user)
+    # Profile will be created by signal with starting balance of 3 Beellars
+    # But ensure it exists in case signal doesn't fire
+    profile, created = UserProfile.objects.get_or_create(
+        user=user,
+        defaults={'timebank_balance': 3}
+    )
+    # If profile already exists but balance is 0, set to 3 (for existing users)
+    if not created and profile.timebank_balance == 0:
+        profile.timebank_balance = 3
+        profile.save()
     return Response({"message": "User registered successfully"}, status=status.HTTP_201_CREATED)
 
 
@@ -326,16 +335,29 @@ def handshake_confirm(request, handshake_id):
 
 
 # ---------------------------------------------------------------------------
-# TRANSACTION HISTORY
+# TRANSACTION HISTORY & BALANCE
 # ---------------------------------------------------------------------------
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+def timebank_balance(request):
+    """Get current user's Timebank balance"""
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+    if created:
+        # Set starting balance for newly created profile
+        profile.timebank_balance = 3
+        profile.save()
+    return Response({"balance": profile.timebank_balance})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def transactions_list(request):
+    """Get transaction history for the logged-in user"""
     transactions = Transaction.objects.filter(
         models.Q(sender=request.user) | models.Q(receiver=request.user)
     ).order_by("-created_at")
-    serializer = TransactionSerializer(transactions, many=True)
+    serializer = TransactionSerializer(transactions, many=True, context={"request": request})
     return Response(serializer.data)
 
 

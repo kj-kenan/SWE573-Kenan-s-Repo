@@ -534,14 +534,21 @@ function RequestDetail() {
                     </button>
                   </div>
                 )}
-                {/* Show chat button if handshake is accepted */}
+                {/* Show chat button only for owner or accepted partner */}
                 {activeHandshake.status !== "proposed" && (
-                  <button
-                    onClick={() => setShowChat(!showChat)}
-                    className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                  >
-                    {showChat ? "Hide Chat" : "Open Chat"}
-                  </button>
+                  (isOwner || 
+                   (activeHandshake.seeker_username && currentUser && 
+                    activeHandshake.seeker_username.toLowerCase() === currentUser.toLowerCase()) ||
+                   (activeHandshake.provider_username && currentUser &&
+                    activeHandshake.provider_username.toLowerCase() === currentUser.toLowerCase())
+                  ) && (
+                    <button
+                      onClick={() => setShowChat(!showChat)}
+                      className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                      {showChat ? "Hide Chat" : "Open Chat"}
+                    </button>
+                  )
                 )}
               </div>
             ) : (
@@ -676,8 +683,14 @@ function RequestDetail() {
             )}
           </div>
 
-          {/* Private Chat Section (after handshake accepted) */}
-          {showChat && activeHandshake && activeHandshake.status !== "proposed" && (
+          {/* Private Chat Section (after handshake accepted) - Only visible to owner or accepted partner */}
+          {showChat && activeHandshake && activeHandshake.status !== "proposed" && 
+            (isOwner || 
+             (activeHandshake.seeker_username && currentUser && 
+              activeHandshake.seeker_username.toLowerCase() === currentUser.toLowerCase()) ||
+             (activeHandshake.provider_username && currentUser &&
+              activeHandshake.provider_username.toLowerCase() === currentUser.toLowerCase())
+            ) && (
             <div className="border-t pt-6 mt-6">
               <h2 className="text-2xl font-semibold text-amber-700 mb-4">
                 Private Chat

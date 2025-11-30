@@ -25,6 +25,7 @@ urlpatterns = [
     path("handshakes/<int:handshake_id>/accept/", views.handshake_accept, name="handshake_accept"),
     path("handshakes/<int:handshake_id>/decline/", views.handshake_decline, name="handshake_decline"),
     path("handshakes/<int:handshake_id>/confirm/", views.handshake_confirm, name="handshake_confirm"),
+    path("timebank/balance/", views.timebank_balance, name="timebank_balance"),
     path("transactions/", views.transactions_list, name="transactions_list"),
     path("questions/", views.questions_list_create, name="questions_list_create"),
     path("questions/<int:question_id>/answer/", views.question_answer, name="question_answer"),

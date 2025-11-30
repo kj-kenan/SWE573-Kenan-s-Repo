@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
-function OffersList() {
+function OffersList({ defaultTab = "offers", defaultSubTab = "all" }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [offers, setOffers] = useState([]);
   const [requests, setRequests] = useState([]);
-  const [activeTab, setActiveTab] = useState("offers");
-  const [activeSubTab, setActiveSubTab] = useState("all"); // "all" or "my"
+  const [activeTab, setActiveTab] = useState(defaultTab);
+  const [activeSubTab, setActiveSubTab] = useState(defaultSubTab); // "all" or "my"
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
@@ -27,8 +28,31 @@ function OffersList() {
         if (username) {
           setCurrentUser(username);
         } else {
-          console.warn("JWT token does not contain 'username' field. Cannot filter user's posts.");
-          setCurrentUser(null);
+          // If username not in token, fetch from backend profile
+          console.warn("JWT token does not contain 'username' field. Fetching from backend...");
+          fetch(`${API_BASE_URL}/api/profiles/me/`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+            .then((res) => {
+              if (res.ok) {
+                return res.json();
+              }
+              throw new Error("Failed to fetch profile");
+            })
+            .then((profile) => {
+              if (profile && profile.username) {
+                setCurrentUser(profile.username);
+              } else {
+                console.error("Profile does not contain username");
+                setCurrentUser(null);
+              }
+            })
+            .catch((err) => {
+              console.error("Error fetching username:", err);
+              setCurrentUser(null);
+            });
         }
       } catch (e) {
         console.error("Error decoding token:", e);
@@ -64,20 +88,44 @@ function OffersList() {
     fetchData();
   }, [API_BASE_URL]);
 
+  // Update active tab/subtab based on URL
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === "/offers" || path === "/offers/all") {
+      setActiveTab("offers");
+      setActiveSubTab("all");
+    } else if (path === "/offers/my") {
+      setActiveTab("offers");
+      setActiveSubTab("my");
+    } else if (path === "/requests/all") {
+      setActiveTab("requests");
+      setActiveSubTab("all");
+    } else if (path === "/requests/my") {
+      setActiveTab("requests");
+      setActiveSubTab("my");
+    }
+  }, [location.pathname]);
+
   if (loading) return <p className="text-center mt-10">Loading services...</p>;
   if (error) return <p className="text-center mt-10 text-red-600">{error}</p>;
 
   // Filter based on active tab and sub-tab
   let currentList = activeTab === "offers" ? offers : requests;
   
-  // If "My Offers" sub-tab is active, filter to show only current user's posts
+  // If "My Offers" or "My Requests" sub-tab is active, filter to show only current user's posts
   // Compare usernames as strings (case-insensitive) for reliability
-  if (activeSubTab === "my" && currentUser && typeof currentUser === 'string') {
-    currentList = currentList.filter((item) => 
-      item.username && 
-      typeof item.username === 'string' &&
-      item.username.toLowerCase().trim() === currentUser.toLowerCase().trim()
-    );
+  if (activeSubTab === "my") {
+    if (currentUser && typeof currentUser === 'string') {
+      currentList = currentList.filter((item) => {
+        if (!item.username || typeof item.username !== 'string') {
+          return false;
+        }
+        return item.username.toLowerCase().trim() === currentUser.toLowerCase().trim();
+      });
+    } else {
+      // If currentUser is not loaded yet, show empty list (will show "You haven't created any..." message)
+      currentList = [];
+    }
   }
 
   return (
@@ -91,8 +139,7 @@ function OffersList() {
         <div className="flex justify-center gap-4">
           <button
             onClick={() => {
-              setActiveTab("offers");
-              setActiveSubTab("all"); // Reset to "all" when switching main tab
+              navigate("/offers/all");
             }}
             className={`px-4 py-2 rounded font-semibold transition ${
               activeTab === "offers"
@@ -104,8 +151,7 @@ function OffersList() {
           </button>
           <button
             onClick={() => {
-              setActiveTab("requests");
-              setActiveSubTab("all"); // Reset to "all" when switching main tab
+              navigate("/requests/all");
             }}
             className={`px-4 py-2 rounded font-semibold transition ${
               activeTab === "requests"
@@ -121,7 +167,7 @@ function OffersList() {
         {currentUser && (
           <div className="flex justify-center gap-2">
             <button
-              onClick={() => setActiveSubTab("all")}
+              onClick={() => navigate(activeTab === "offers" ? "/offers/all" : "/requests/all")}
               className={`px-3 py-1 rounded text-sm font-medium transition ${
                 activeSubTab === "all"
                   ? "bg-amber-400 text-white shadow"
@@ -131,7 +177,7 @@ function OffersList() {
               All {activeTab === "offers" ? "Offers" : "Requests"}
             </button>
             <button
-              onClick={() => setActiveSubTab("my")}
+              onClick={() => navigate(activeTab === "offers" ? "/offers/my" : "/requests/my")}
               className={`px-3 py-1 rounded text-sm font-medium transition ${
                 activeSubTab === "my"
                   ? "bg-amber-400 text-white shadow"
@@ -157,15 +203,33 @@ function OffersList() {
               ? `/offers/${item.id}` 
               : `/requests/${item.id}`;
             
+            // Check if current user owns this post
+            const isOwnPost = Boolean(
+              currentUser && 
+              typeof currentUser === 'string' &&
+              item.username && 
+              typeof item.username === 'string' &&
+              currentUser.toLowerCase().trim() === item.username.toLowerCase().trim()
+            );
+            
             return (
               <div
                 key={item.id}
-                className="border p-4 rounded-lg shadow-sm hover:shadow-md transition cursor-pointer"
+                className={`border p-4 rounded-lg shadow-sm hover:shadow-md transition cursor-pointer ${
+                  isOwnPost && activeSubTab === "all" ? "bg-amber-50 border-amber-300" : ""
+                }`}
                 onClick={() => navigate(detailPath)}
               >
-                <h3 className="font-bold text-lg mb-1 text-amber-700">
-                  {item.title}
-                </h3>
+                <div className="flex items-start justify-between mb-1">
+                  <h3 className="font-bold text-lg text-amber-700 flex-1">
+                    {item.title}
+                  </h3>
+                  {isOwnPost && activeSubTab === "all" && (
+                    <span className="ml-2 px-2 py-1 bg-amber-500 text-white text-xs font-semibold rounded">
+                      Your post
+                    </span>
+                  )}
+                </div>
                 <p className="text-gray-700 mb-2 line-clamp-2">{item.description}</p>
                 <p className="text-sm text-gray-500 mb-2">
                   🏷️ {item.tags || "No tags"} | ⏰ {item.duration || "N/A"}
@@ -176,8 +240,9 @@ function OffersList() {
                   </p>
                 )}
                 <p className="text-xs text-gray-400 mt-2">Click to view details →</p>
-                {activeSubTab === "my" && (
-                  <div className="mt-2 flex gap-2">
+                {/* Show owner controls in "All" view for own posts, or in "My" view for all posts */}
+                {(isOwnPost && activeSubTab === "all") || activeSubTab === "my" ? (
+                  <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -201,7 +266,7 @@ function OffersList() {
                       Delete
                     </button>
                   </div>
-                )}
+                ) : null}
               </div>
             );
           })}

@@ -27,7 +27,8 @@ Badge: Profile recognition for milestones
 
 Wikidata API (semantic tags)
 
-Constraints
+*Constraints*
+
 The system must be developed using Django for the backend and React for the frontend
 
 The database must use PostgreSQL for data storage
@@ -44,7 +45,8 @@ The application must operate within the hosting provider’s free-tier resource 
 
 Only authenticated users can create or edit offers and needs
 
-Specific Requirements User Management
+*Specific Requirements User Management*
+
 The system shall allow new users to register with a unique username, email, and password
 
 The system shall verify user credentials during login
@@ -80,7 +82,7 @@ The system shall allow users to view and track their earned badges on their prof
 The system shall only allow users to rate each other after a handshake is fully completed. Ratings shall not be given for posts, questions, or any interaction other than a completed handshake.
 
 
-Post Management
+*Post Management*
 
 The system shall allow users to create new posts for offers and needs
 
@@ -104,7 +106,23 @@ The system shall allow administrators to remove or hide inappropriate posts
 
 The system shall allow users to specify their available time slots when creating or editing an offer or need post.
 
-Map
+The system shall visually distinguish posts owned by the logged-in user in public listings.
+
+The system shall display owner-specific controls (Edit, Delete, Answer Questions, Manage Handshake) only on posts created by the logged-in user.
+
+The system shall rename the navigation item “Offers & Needs” to “Offers & Requests.”
+
+The system shall provide the following sub-pages under Offers & Requests:
+
+All Offers — displays all public offers
+
+All Requests — displays all public requests
+
+My Offers — displays only the user’s own offers
+
+My Requests — displays only the user’s own requests
+
+*Map*
 
 The system shall display all active offers and needs on an interactive map
 
@@ -120,7 +138,7 @@ The system shall automatically update the map when new posts are created or remo
 
 The system shall support zooming and panning interactions
 
-Handshake and Interaction
+*Handshake and Interaction*
 
 The system shall allow a user to send a handshake request to another user’s post
 
@@ -148,8 +166,18 @@ The system shall not allow users to ask questions on their own posts.
 
 The system shall allow post owners to publicly answer questions asked on their posts before a handshake is accepted.
 
+Once a handshake is mutually accepted, the post should be hidden from public listings.
 
-Timebank
+After a handshake is accepted, no other user should be able to initiate a handshake for that post.
+
+After a handshake is accepted, the post’s Q&A section should be visible only to the owner and the accepted partner.
+
+The system should automatically update the post status to “in-progress” after handshake acceptance.
+
+When the exchange is completed by both parties, the system should mark the post as “completed” and remove it from active listings.
+
+
+*Timebank*
 
 The system shall define 1 Beellar as equivalent to 1 hour of service
 
@@ -167,7 +195,23 @@ The system shall prevent transactions that would cause a negative Beellar balanc
 
 The system shall allow administrators to view and manage all Beellar transactions
 
-Ratings
+The system shall initialize every newly registered user with 3 Beellars as a starting balance.
+
+The Timebank tab shall display the user’s current Beellar balance.
+
+The Timebank tab shall display a chronological transaction history, including: date, type (earned/spent), handshake ID / related post, amount
+
+The system shall label transactions as either earned (credit) or spent (debit).
+
+The Timebank tab shall clearly distinguish between incoming and outgoing Beellar transfers.
+
+The system shall automatically add a transaction entry when a handshake is completed.
+
+The system shall allow sorting or filtering transaction history by date or type.
+
+The Timebank tab shall only be visible to authenticated users.
+
+*Ratings*
 
 The system shall allow both users to rate each other and leave comments after each completed handshake
 
@@ -175,7 +219,7 @@ The system shall store and publicly display user ratings and feedback on profile
 
 The system shall allow users to view and track their earned badges
 
-Communication and Forum
+*Communication and Forum*
 
 The system shall allow users to send direct messages after a handshake is established
 
@@ -187,7 +231,12 @@ The system shall allow administrators to moderate forum content and remove inapp
 
 The system shall display timestamps and usernames for all forum messages
 
-Non-Functional Requirements
+Only the post owner and the accepted partner should be able to start or access a private chat; other users should not have access.
+
+Only the post owner and the accepted partner should be able to start or access a private chat; other users should not have access.
+
+*Non-Functional Requirements*
+
 The system shall respond to user requests within 3 seconds under normal load
 
 The system shall use HTTPS for all client–server communication
