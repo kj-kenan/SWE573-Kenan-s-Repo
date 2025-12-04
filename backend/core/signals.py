@@ -8,8 +8,11 @@ from .models import UserProfile
 def create_user_profile(sender, instance, created, **kwargs):
     """Automatically create a UserProfile when a new User is created."""
     if created:
-        # Create profile with starting balance of 3 Beellars
+        # Create profile with starting balance of 3 Beellars and email_verified=False
         UserProfile.objects.get_or_create(
             user=instance,
-            defaults={'timebank_balance': 3}
+            defaults={
+                'timebank_balance': 3,
+                'email_verified': False
+            }
         )

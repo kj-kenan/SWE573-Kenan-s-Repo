@@ -31,7 +31,8 @@ function Register() {
       const data = await response.json();
 
       if (response.ok) {
-        setMessage(data.message || "Registration successful!");
+        // Redirect to check email page
+        navigate("/check-email", { state: { email: email } });
       } else {
         setMessage(data.error || "Something went wrong.");
       }
@@ -58,9 +59,10 @@ function Register() {
         />
         <input
           type="email"
-          placeholder="Email (optional)"
+          placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          required
           style={{ display: "block", width: "100%", marginBottom: "10px" }}
         />
         <input

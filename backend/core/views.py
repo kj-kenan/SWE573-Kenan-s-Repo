@@ -7,6 +7,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import models
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 
 from .models import UserProfile, Offer, Request as RequestModel, Handshake, Transaction, Question, Message, Rating, Badge
 from .serializers import (
@@ -20,6 +22,7 @@ from .serializers import (
     RatingSerializer,
     BadgeSerializer,
 )
+from .email_utils import send_activation_email
 
 # ---------------------------------------------------------------------------
 # BASIC ROUTES
@@ -41,29 +44,174 @@ def health(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def register_user(request):
-    username = request.data.get("username")
-    password = request.data.get("password")
-    email = request.data.get("email")
+    try:
+        username = request.data.get("username")
+        password = request.data.get("password")
+        email = request.data.get("email")
 
-    if not username or not password:
-        return Response({"error": "Username and password required"}, status=status.HTTP_400_BAD_REQUEST)
+        # Validate required fields
+        if not username or not password:
+            return Response({"error": "Username and password required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not email:
+            return Response({"error": "Email address is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate email format
+        try:
+            validate_email(email)
+        except ValidationError:
+            return Response({"error": "Invalid email address format"}, status=status.HTTP_400_BAD_REQUEST)
 
-    if User.objects.filter(username=username).exists():
-        return Response({"error": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        # Check for duplicate username
+        if User.objects.filter(username=username).exists():
+            return Response({"error": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check for duplicate email
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "Email address is already registered"}, status=status.HTTP_400_BAD_REQUEST)
 
-    user = User.objects.create_user(username=username, password=password, email=email)
-    user.save()
-    # Profile will be created by signal with starting balance of 3 Beellars
-    # But ensure it exists in case signal doesn't fire
-    profile, created = UserProfile.objects.get_or_create(
-        user=user,
-        defaults={'timebank_balance': 3}
-    )
-    # If profile already exists but balance is 0, set to 3 (for existing users)
-    if not created and profile.timebank_balance == 0:
-        profile.timebank_balance = 3
+        # Create user with email_verified=False
+        user = User.objects.create_user(username=username, password=password, email=email)
+        
+        # Profile will be created by signal with starting balance of 3 Beellars
+        # But ensure it exists in case signal doesn't fire
+        profile, created = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                'timebank_balance': 3,
+                'email_verified': False
+            }
+        )
+        
+        # If profile already exists but balance is 0, set to 3 (for existing users)
+        if not created and profile.timebank_balance == 0:
+            profile.timebank_balance = 3
+        # Ensure email_verified is False for new registrations
+        # Check if field exists before trying to set it (in case migration hasn't run)
+        if hasattr(profile, 'email_verified'):
+            profile.email_verified = False
         profile.save()
-    return Response({"message": "User registered successfully"}, status=status.HTTP_201_CREATED)
+        
+        # Send activation email (wrap in try-except so it doesn't fail registration)
+        email_sent = False
+        try:
+            print(f"[DEBUG] Attempting to send activation email to {user.email}")
+            email_sent = send_activation_email(user, request)
+            print(f"[DEBUG] Email sending result: {email_sent}")
+        except Exception as e:
+            import traceback
+            print(f"[ERROR] Error sending activation email: {str(e)}")
+            traceback.print_exc()
+            # Don't fail registration if email fails - user can request resend later
+        
+        return Response({
+            "message": "Registration successful! Please check your email to activate your account.",
+            "email_sent": email_sent
+        }, status=status.HTTP_201_CREATED)
+    
+    except Exception as e:
+        import traceback
+        error_msg = str(e)
+        traceback.print_exc()
+        return Response({
+            "error": f"Registration failed: {error_msg}"
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def activate_account(request):
+    """
+    Activate user account using activation token.
+    POST /api/auth/activate/ with body: {"token": "..."}
+    """
+    token = request.data.get("token")
+    
+    if not token:
+        return Response({"error": "Activation token is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    from .email_utils import validate_activation_token, send_verification_success_email
+    
+    is_valid, user_id, error_message = validate_activation_token(token)
+    
+    if not is_valid:
+        return Response({"error": error_message}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        user = User.objects.get(pk=user_id)
+        profile = user.profile
+    except User.DoesNotExist:
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+    except UserProfile.DoesNotExist:
+        return Response({"error": "User profile not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if already verified
+    if profile.email_verified:
+        return Response({
+            "message": "Email is already verified. You can log in.",
+            "already_verified": True
+        }, status=status.HTTP_200_OK)
+    
+    # Activate the account
+    profile.email_verified = True
+    profile.save()
+    
+    # Send success notification email (optional)
+    send_verification_success_email(user)
+    
+    return Response({
+        "message": "Email verified successfully! You can now log in.",
+        "verified": True
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def resend_activation(request):
+    """
+    Resend activation email to user.
+    POST /api/auth/resend-activation/ with body: {"email": "..."} or {"username": "..."}
+    """
+    email = request.data.get("email")
+    username = request.data.get("username")
+    
+    if not email and not username:
+        return Response({"error": "Email or username is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        if email:
+            user = User.objects.get(email=email)
+        else:
+            user = User.objects.get(username=username)
+    except User.DoesNotExist:
+        # Don't reveal whether user exists for security reasons
+        return Response({
+            "message": "If an account with that email/username exists, an activation email has been sent."
+        }, status=status.HTTP_200_OK)
+    
+    # Check if already verified
+    try:
+        profile = user.profile
+        if profile.email_verified:
+            return Response({
+                "message": "Email is already verified. You can log in.",
+                "already_verified": True
+            }, status=status.HTTP_200_OK)
+    except UserProfile.DoesNotExist:
+        # Create profile if it doesn't exist
+        profile = UserProfile.objects.create(user=user, timebank_balance=3, email_verified=False)
+    
+    # Resend activation email
+    email_sent = send_activation_email(user, request)
+    
+    if email_sent:
+        return Response({
+            "message": "Activation email has been sent. Please check your inbox."
+        }, status=status.HTTP_200_OK)
+    else:
+        return Response({
+            "error": "Failed to send activation email. Please try again later."
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])

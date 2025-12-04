@@ -43,8 +43,22 @@ function Login() {
         setMessage(`Welcome, ${username}!`);
         navigate("/home");
       } else {
-        // login başarısız
-        setMessage(data.detail || "Invalid credentials. Please try again.");
+        // Check if email is not verified
+        if (response.status === 403 && data.error === "email_not_verified") {
+          setMessage(data.message || "Please verify your email address before logging in.");
+          // Redirect to resend activation page after showing message
+          setTimeout(() => {
+            navigate("/resend-activation", { 
+              state: { 
+                message: data.message || "Please verify your email address before logging in.",
+                username: username
+              } 
+            });
+          }, 2000);
+        } else {
+          // login başarısız
+          setMessage(data.detail || data.error || "Invalid credentials. Please try again.");
+        }
       }
     } catch (error) {
       console.error("Login error:", error);

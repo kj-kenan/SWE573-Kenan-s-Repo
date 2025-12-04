@@ -11,6 +11,9 @@ import Landing from "./components/Landing";
 import Home from "./components/Home";
 import Register from "./components/Register";
 import Login from "./components/Login";
+import CheckEmail from "./components/CheckEmail";
+import Activate from "./components/Activate";
+import ResendActivation from "./components/ResendActivation";
 import ProfileList from "./components/ProfileList";
 import CreateService from "./components/CreateService";
 //import ServiceMap from "./components/ServiceMap";
@@ -36,7 +39,10 @@ function Navbar({ onLogout }) {
   if (
     location.pathname === "/" ||
     location.pathname === "/login" ||
-    location.pathname === "/register"
+    location.pathname === "/register" ||
+    location.pathname.startsWith("/activate/") ||
+    location.pathname === "/check-email" ||
+    location.pathname === "/resend-activation"
   )
     return null;
 
@@ -203,6 +209,9 @@ function App() {
           <Route path="/home" element={<Home />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/check-email" element={<CheckEmail />} />
+          <Route path="/activate/:token" element={<Activate />} />
+          <Route path="/resend-activation" element={<ResendActivation />} />
           <Route path="/profile" element={<ProfileList />} />
           <Route path="/profile/:userId" element={<ProfileList />} />
           <Route path="/create" element={<CreateService />} />

@@ -70,6 +70,7 @@ class UserProfile(models.Model):
     district = models.CharField(max_length=100, blank=True)
     is_visible = models.BooleanField(default=True)
     timebank_balance = models.PositiveIntegerField(default=0)
+    email_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

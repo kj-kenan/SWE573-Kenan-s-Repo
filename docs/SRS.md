@@ -45,27 +45,15 @@ The application must operate within the hosting provider’s free-tier resource 
 
 Only authenticated users can create or edit offers and needs
 
-*Specific Requirements User Management*
+*User Management*
 
-The system shall allow new users to register with a unique username, email, and password
+The system shall allow new users to register with a unique username and password.
 
-The system shall verify user credentials during login
+The system shall verify user credentials during login.
 
-The system shall prevent duplicate usernames or emails during registration
+The system shall prevent duplicate usernames during registration.
 
-The system shall allow users to reset their passwords via email
-
-The system shall authenticate users using JWT-based tokens
-
-The system shall allow users to edit their profile information (bio, skills, interests, picture)
-
-The system shall allow users to view other users’ public profiles
-
-The system shall allow users to delete or deactivate their accounts
-
-The system shall allow administrators to view and manage all registered users
-
-The system shall notify users upon successful registration or account changes
+The system shall authenticate users using JWT-based tokens.
 
 The system shall allow users to edit their profile information (bio, skills, interests, and profile picture).
 
@@ -80,6 +68,36 @@ The system shall store and publicly display user ratings and feedback on user pr
 The system shall allow users to view and track their earned badges on their profiles.
 
 The system shall only allow users to rate each other after a handshake is fully completed. Ratings shall not be given for posts, questions, or any interaction other than a completed handshake.
+
+*User Email & Verification*
+
+The system shall require users to register with a unique and valid email address.
+
+The system shall prevent duplicate email addresses during registration.
+
+The system shall allow users to reset their passwords via email.
+
+The system shall notify users upon successful registration or account changes.
+
+The system shall send a verification email containing a secure, time-limited activation token to newly registered users.
+
+The system shall require users to verify their email address before allowing login or access to any authenticated features.
+
+The system shall store an “email_verified” status flag for each user in the database.
+
+The system shall prevent unverified users from logging in until their email has been successfully activated.
+
+The system shall provide an endpoint for email verification using a token-based activation link.
+
+The verification token shall expire after a predefined time period (e.g., 24 hours).
+
+The system shall allow users to request a new verification email if the token has expired or was not received.
+
+After registration, the system shall display a “Check your email to activate your account” confirmation message.
+
+The system shall display appropriate success or error messages when a user attempts to verify their email or log in without verification.
+
+The system shall notify users upon successful verification of their email address.
 
 
 *Post Management*
