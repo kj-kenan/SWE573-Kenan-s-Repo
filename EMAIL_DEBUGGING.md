@@ -92,3 +92,5 @@ FRONTEND_URL=http://localhost:3000
 
 Try registering a user right now and watch your server console - you should see the email appear immediately!
 
+
+

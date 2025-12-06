@@ -140,6 +140,18 @@ My Offers — displays only the user’s own offers
 
 My Requests — displays only the user’s own requests
 
+The system shall provide secure API endpoints for editing and deleting posts.
+
+The system shall allow only the post owner to edit or delete their posts through these endpoints.
+
+The system shall require JWT authentication for all edit and delete operations.
+
+The system shall reject edit or delete attempts for posts not owned by the authenticated user.
+
+The system shall validate updated post data before saving changes.
+
+The system shall prevent deletion of posts that have an active handshake.
+
 *Map*
 
 The system shall display all active offers and needs on an interactive map
@@ -155,6 +167,14 @@ The system shall allow users to filter visible markers by category or distance
 The system shall automatically update the map when new posts are created or removed
 
 The system shall support zooming and panning interactions
+
+The system shall allow users to filter map markers by tag, category, and distance.
+
+The system shall provide a distance slider on the map to limit visible posts based on proximity to the user’s current location.
+
+The system shall allow users to filter posts by date range when applicable (e.g., post creation date or availability window).
+
+The system shall update all map markers dynamically when filters change.
 
 *Handshake and Interaction*
 

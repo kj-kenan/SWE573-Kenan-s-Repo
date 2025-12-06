@@ -246,19 +246,53 @@ function OffersList({ defaultTab = "offers", defaultSubTab = "all" }) {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        // TODO: Implement edit functionality
-                        alert("Edit functionality coming soon!");
+                        const editPath = activeTab === "offers" 
+                          ? `/offers/${item.id}/edit`
+                          : `/requests/${item.id}/edit`;
+                        navigate(editPath);
                       }}
                       className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
                     >
                       Edit
                     </button>
                     <button
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        // TODO: Implement delete functionality
-                        if (window.confirm("Are you sure you want to delete this post?")) {
-                          alert("Delete functionality coming soon!");
+                        if (!window.confirm("Are you sure you want to delete this post? This action cannot be undone.")) {
+                          return;
+                        }
+                        
+                        const token = localStorage.getItem("access");
+                        if (!token) {
+                          alert("Please log in to delete a post.");
+                          return;
+                        }
+
+                        try {
+                          const deleteEndpoint = activeTab === "offers"
+                            ? `${API_BASE_URL}/api/offers/${item.id}/delete/`
+                            : `${API_BASE_URL}/api/requests/${item.id}/delete/`;
+                          
+                          const response = await fetch(deleteEndpoint, {
+                            method: "DELETE",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${token}`,
+                            },
+                          });
+
+                          const data = await response.json();
+
+                          if (response.ok) {
+                            alert("Post deleted successfully!");
+                            // Refresh the list
+                            window.location.reload();
+                          } else {
+                            alert(data.error || "Failed to delete post.");
+                          }
+                        } catch (err) {
+                          alert("Network error. Please try again.");
+                          console.error("Error:", err);
                         }
                       }}
                       className="text-xs px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"

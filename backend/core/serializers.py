@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.core.exceptions import ValidationError
 from .models import UserProfile, Offer, Request, Handshake, Transaction, Question, Message, Rating, Badge
+from .location_utils import get_fuzzy_coordinates
 
 # ---------------------------------------------------------------------------
 # USER PROFILE
@@ -47,6 +48,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class OfferSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
     active_handshake = serializers.SerializerMethodField()
+    fuzzy_lat = serializers.SerializerMethodField()
+    fuzzy_lng = serializers.SerializerMethodField()
 
     class Meta:
         model = Offer
@@ -62,6 +65,8 @@ class OfferSerializer(serializers.ModelSerializer):
             "tags",
             "latitude",
             "longitude",
+            "fuzzy_lat",
+            "fuzzy_lng",
             "status",
             "created_at",
             "active_handshake",
@@ -70,6 +75,34 @@ class OfferSerializer(serializers.ModelSerializer):
 
     def get_username(self, obj):
         return obj.user.username if obj.user else None
+
+    def get_fuzzy_lat(self, obj):
+        """Calculate fuzzy latitude for map display using 2D circular scatter"""
+        if obj.latitude is None or obj.longitude is None:
+            return None
+        owner_id = obj.user.id if obj.user else None
+        fuzzy_lat, _ = get_fuzzy_coordinates(
+            obj.latitude, 
+            obj.longitude, 
+            obj.id,
+            created_at=obj.created_at,
+            owner_id=owner_id
+        )
+        return fuzzy_lat
+
+    def get_fuzzy_lng(self, obj):
+        """Calculate fuzzy longitude for map display using 2D circular scatter"""
+        if obj.latitude is None or obj.longitude is None:
+            return None
+        owner_id = obj.user.id if obj.user else None
+        _, fuzzy_lng = get_fuzzy_coordinates(
+            obj.latitude, 
+            obj.longitude, 
+            obj.id,
+            created_at=obj.created_at,
+            owner_id=owner_id
+        )
+        return fuzzy_lng
 
     def get_active_handshake(self, obj):
         """Return active handshake info if exists"""
@@ -91,6 +124,8 @@ class OfferSerializer(serializers.ModelSerializer):
 class RequestSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
     active_handshake = serializers.SerializerMethodField()
+    fuzzy_lat = serializers.SerializerMethodField()
+    fuzzy_lng = serializers.SerializerMethodField()
 
     class Meta:
         model = Request
@@ -106,6 +141,8 @@ class RequestSerializer(serializers.ModelSerializer):
             "tags",
             "latitude",
             "longitude",
+            "fuzzy_lat",
+            "fuzzy_lng",
             "status",
             "created_at",
             "active_handshake",
@@ -114,6 +151,34 @@ class RequestSerializer(serializers.ModelSerializer):
 
     def get_username(self, obj):
         return obj.user.username if obj.user else None
+
+    def get_fuzzy_lat(self, obj):
+        """Calculate fuzzy latitude for map display using 2D circular scatter"""
+        if obj.latitude is None or obj.longitude is None:
+            return None
+        owner_id = obj.user.id if obj.user else None
+        fuzzy_lat, _ = get_fuzzy_coordinates(
+            obj.latitude, 
+            obj.longitude, 
+            obj.id,
+            created_at=obj.created_at,
+            owner_id=owner_id
+        )
+        return fuzzy_lat
+
+    def get_fuzzy_lng(self, obj):
+        """Calculate fuzzy longitude for map display using 2D circular scatter"""
+        if obj.latitude is None or obj.longitude is None:
+            return None
+        owner_id = obj.user.id if obj.user else None
+        _, fuzzy_lng = get_fuzzy_coordinates(
+            obj.latitude, 
+            obj.longitude, 
+            obj.id,
+            created_at=obj.created_at,
+            owner_id=owner_id
+        )
+        return fuzzy_lng
 
     def get_active_handshake(self, obj):
         """Return active handshake info if exists - seeker is anonymous until accepted"""

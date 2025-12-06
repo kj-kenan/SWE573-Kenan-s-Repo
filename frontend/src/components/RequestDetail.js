@@ -329,6 +329,46 @@ function RequestDetail() {
     }
   }, [showChat, request, API_BASE_URL]);
 
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this request? This action cannot be undone.")) {
+      return;
+    }
+
+    const token = localStorage.getItem("access");
+    if (!token) {
+      setMessage("Please log in.");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/requests/${id}/delete/`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage("Request deleted successfully.");
+        // Redirect to user's requests page after 1 second
+        setTimeout(() => {
+          navigate("/requests/my");
+        }, 1000);
+      } else {
+        setMessage(data.error || "Failed to delete request.");
+      }
+    } catch (err) {
+      setMessage("Network error. Please try again.");
+      console.error("Error:", err);
+    }
+  };
+
   const handleDeclineHandshake = async (handshakeId) => {
     const token = localStorage.getItem("access");
     if (!token) {
@@ -416,7 +456,25 @@ function RequestDetail() {
         </button>
 
         <div className="bg-white rounded-2xl shadow-lg p-8">
-          <h1 className="text-4xl font-bold text-amber-700 mb-4">{request.title}</h1>
+          <div className="flex justify-between items-start mb-4">
+            <h1 className="text-4xl font-bold text-amber-700">{request.title}</h1>
+            {isOwner && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => navigate(`/requests/${id}/edit`)}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
+                >
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="mb-6">
             <p className="text-gray-600 mb-2">

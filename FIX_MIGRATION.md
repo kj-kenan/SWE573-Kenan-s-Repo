@@ -70,3 +70,5 @@ After the migration is applied:
 
 If it doesn't exist, the migration needs to be created first.
 
+
+

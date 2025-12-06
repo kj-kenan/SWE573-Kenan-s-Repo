@@ -29,6 +29,8 @@ import OffersList from "./components/OfferList";
 import TimeBank from "./components/TimeBank";
 import OfferDetail from "./components/OfferDetail";
 import RequestDetail from "./components/RequestDetail";
+import EditOffer from "./components/EditOffer";
+import EditRequest from "./components/EditRequest";
 import HandshakesList from "./components/HandshakesList";
 
 function Navbar({ onLogout }) {
@@ -221,7 +223,9 @@ function App() {
           <Route path="/requests/all" element={<OffersList defaultTab="requests" defaultSubTab="all" />} />
           <Route path="/requests/my" element={<OffersList defaultTab="requests" defaultSubTab="my" />} />
           <Route path="/offers/:id" element={<OfferDetail />} />
+          <Route path="/offers/:id/edit" element={<EditOffer />} />
           <Route path="/requests/:id" element={<RequestDetail />} />
+          <Route path="/requests/:id/edit" element={<EditRequest />} />
           <Route path="/handshakes" element={<HandshakesList />} />
           <Route path="/settings" element={<h1 className="text-center mt-20 text-3xl">Settings Page</h1>}/>
           <Route path="/timebank" element={<TimeBank/>}/>

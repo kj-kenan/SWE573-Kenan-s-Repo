@@ -304,7 +304,74 @@ def profile_own(request):
 def offers_list_create(request):
     if request.method == "GET":
         try:
-            offers = Offer.objects.all().order_by("-created_at")
+            from django.utils import timezone
+            from datetime import datetime, timedelta
+            from .location_utils import calculate_distance_km, get_fuzzy_coordinates
+            
+            # Filter out cancelled (deleted) offers
+            offers = Offer.objects.exclude(status="cancelled")
+            
+            # Filter by tag
+            tag = request.query_params.get("tag", None)
+            if tag:
+                offers = offers.filter(tags__icontains=tag)
+            
+            # Filter by date range (created_at)
+            min_date = request.query_params.get("min_date", None)
+            max_date = request.query_params.get("max_date", None)
+            if min_date:
+                try:
+                    min_date_obj = datetime.strptime(min_date, "%Y-%m-%d").date()
+                    offers = offers.filter(created_at__date__gte=min_date_obj)
+                except ValueError:
+                    pass
+            if max_date:
+                try:
+                    max_date_obj = datetime.strptime(max_date, "%Y-%m-%d").date()
+                    offers = offers.filter(created_at__date__lte=max_date_obj)
+                except ValueError:
+                    pass
+            
+            # Filter by distance (using fuzzy coordinates)
+            distance_km = request.query_params.get("distance", None)
+            user_lat = request.query_params.get("lat", None)
+            user_lng = request.query_params.get("lng", None)
+            
+            if distance_km and user_lat and user_lng:
+                try:
+                    distance_km = float(distance_km)
+                    user_lat = float(user_lat)
+                    user_lng = float(user_lng)
+                    
+                    # Filter offers within distance using fuzzy coordinates
+                    filtered_offers = []
+                    for offer in offers:
+                        if offer.latitude is None or offer.longitude is None:
+                            continue
+                        
+                        # Calculate fuzzy coordinates for this offer
+                        owner_id = offer.user.id if offer.user else None
+                        fuzzy_lat, fuzzy_lng = get_fuzzy_coordinates(
+                            offer.latitude,
+                            offer.longitude,
+                            offer.id,
+                            created_at=offer.created_at,
+                            owner_id=owner_id
+                        )
+                        
+                        if fuzzy_lat and fuzzy_lng:
+                            # Calculate distance from user to fuzzy location
+                            dist = calculate_distance_km(user_lat, user_lng, fuzzy_lat, fuzzy_lng)
+                            if dist <= distance_km:
+                                filtered_offers.append(offer)
+                    
+                    offers = Offer.objects.filter(
+                        id__in=[o.id for o in filtered_offers]
+                    )
+                except (ValueError, TypeError):
+                    pass
+            
+            offers = offers.order_by("-created_at")
             serializer = OfferSerializer(offers, many=True)
             return Response(serializer.data)
         except Exception as e:
@@ -342,12 +409,159 @@ def offer_detail(request, offer_id):
         )
 
 
+@api_view(["PUT", "PATCH"])
+@permission_classes([IsAuthenticated])
+def offer_edit(request, offer_id):
+    """
+    Edit an offer. Only the owner can edit their own offer.
+    PUT /api/offers/<id>/edit/
+    """
+    try:
+        offer = Offer.objects.get(pk=offer_id)
+    except Offer.DoesNotExist:
+        return Response(
+            {"error": "Offer not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Check ownership
+    if offer.user != request.user:
+        return Response(
+            {"error": "You can only edit your own offers."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Validate and update
+    serializer = OfferSerializer(offer, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def offer_delete(request, offer_id):
+    """
+    Delete (soft-delete) an offer. Only the owner can delete their own offer.
+    Posts with active handshakes cannot be deleted.
+    DELETE /api/offers/<id>/delete/
+    """
+    try:
+        offer = Offer.objects.get(pk=offer_id)
+    except Offer.DoesNotExist:
+        return Response(
+            {"error": "Offer not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Check ownership or admin status
+    is_admin = request.user.is_staff or request.user.is_superuser
+    if offer.user != request.user and not is_admin:
+        return Response(
+            {"error": "You can only delete your own offers."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Check for active handshakes (admins can delete regardless)
+    if not is_admin:
+        active_handshakes = offer.handshakes.filter(
+            status__in=["proposed", "accepted", "in_progress"]
+        ).exists()
+        
+        if active_handshakes:
+            return Response(
+                {"error": "Cannot delete offer with an active handshake. Please wait for the handshake to complete or be declined."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    # Soft-delete: mark as cancelled (or admin can hard-delete)
+    if is_admin:
+        offer.delete()
+        return Response(
+            {"message": "Offer deleted successfully."},
+            status=status.HTTP_200_OK
+        )
+    else:
+        offer.status = "cancelled"
+        offer.save()
+        return Response(
+            {"message": "Offer deleted successfully."},
+            status=status.HTTP_200_OK
+        )
+
+
 @api_view(["GET", "POST"])
 @permission_classes([AllowAny])
 def requests_list_create(request):
     if request.method == "GET":
         try:
-            requests = RequestModel.objects.all().order_by("-created_at")
+            from django.utils import timezone
+            from datetime import datetime, timedelta
+            from .location_utils import calculate_distance_km, get_fuzzy_coordinates
+            
+            # Filter out cancelled (deleted) requests
+            requests = RequestModel.objects.exclude(status="cancelled")
+            
+            # Filter by tag
+            tag = request.query_params.get("tag", None)
+            if tag:
+                requests = requests.filter(tags__icontains=tag)
+            
+            # Filter by date range (created_at)
+            min_date = request.query_params.get("min_date", None)
+            max_date = request.query_params.get("max_date", None)
+            if min_date:
+                try:
+                    min_date_obj = datetime.strptime(min_date, "%Y-%m-%d").date()
+                    requests = requests.filter(created_at__date__gte=min_date_obj)
+                except ValueError:
+                    pass
+            if max_date:
+                try:
+                    max_date_obj = datetime.strptime(max_date, "%Y-%m-%d").date()
+                    requests = requests.filter(created_at__date__lte=max_date_obj)
+                except ValueError:
+                    pass
+            
+            # Filter by distance (using fuzzy coordinates)
+            distance_km = request.query_params.get("distance", None)
+            user_lat = request.query_params.get("lat", None)
+            user_lng = request.query_params.get("lng", None)
+            
+            if distance_km and user_lat and user_lng:
+                try:
+                    distance_km = float(distance_km)
+                    user_lat = float(user_lat)
+                    user_lng = float(user_lng)
+                    
+                    # Filter requests within distance using fuzzy coordinates
+                    filtered_requests = []
+                    for req in requests:
+                        if req.latitude is None or req.longitude is None:
+                            continue
+                        
+                        # Calculate fuzzy coordinates for this request
+                        owner_id = req.user.id if req.user else None
+                        fuzzy_lat, fuzzy_lng = get_fuzzy_coordinates(
+                            req.latitude,
+                            req.longitude,
+                            req.id,
+                            created_at=req.created_at,
+                            owner_id=owner_id
+                        )
+                        
+                        if fuzzy_lat and fuzzy_lng:
+                            # Calculate distance from user to fuzzy location
+                            dist = calculate_distance_km(user_lat, user_lng, fuzzy_lat, fuzzy_lng)
+                            if dist <= distance_km:
+                                filtered_requests.append(req)
+                    
+                    requests = RequestModel.objects.filter(
+                        id__in=[r.id for r in filtered_requests]
+                    )
+                except (ValueError, TypeError):
+                    pass
+            
+            requests = requests.order_by("-created_at")
             serializer = RequestSerializer(requests, many=True)
             return Response(serializer.data)
         except Exception as e:
@@ -382,6 +596,86 @@ def request_detail(request, request_id):
     except Exception as e:
         return Response(
             {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(["PUT", "PATCH"])
+@permission_classes([IsAuthenticated])
+def request_edit(request, request_id):
+    """
+    Edit a request. Only the owner can edit their own request.
+    PUT /api/requests/<id>/edit/
+    """
+    try:
+        request_obj = RequestModel.objects.get(pk=request_id)
+    except RequestModel.DoesNotExist:
+        return Response(
+            {"error": "Request not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Check ownership
+    if request_obj.user != request.user:
+        return Response(
+            {"error": "You can only edit your own requests."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Validate and update
+    serializer = RequestSerializer(request_obj, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def request_delete(request, request_id):
+    """
+    Delete (soft-delete) a request. Only the owner can delete their own request.
+    Posts with active handshakes cannot be deleted.
+    DELETE /api/requests/<id>/delete/
+    """
+    try:
+        request_obj = RequestModel.objects.get(pk=request_id)
+    except RequestModel.DoesNotExist:
+        return Response(
+            {"error": "Request not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Check ownership or admin status
+    is_admin = request.user.is_staff or request.user.is_superuser
+    if request_obj.user != request.user and not is_admin:
+        return Response(
+            {"error": "You can only delete your own requests."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Check for active handshakes (admins can delete regardless)
+    if not is_admin:
+        active_handshakes = request_obj.handshakes.filter(
+            status__in=["proposed", "accepted", "in_progress"]
+        ).exists()
+        
+        if active_handshakes:
+            return Response(
+                {"error": "Cannot delete request with an active handshake. Please wait for the handshake to complete or be declined."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    # Soft-delete: mark as cancelled (or admin can hard-delete)
+    if is_admin:
+        request_obj.delete()
+        return Response(
+            {"message": "Request deleted successfully."},
+            status=status.HTTP_200_OK
+        )
+    else:
+        request_obj.status = "cancelled"
+        request_obj.save()
+        return Response(
+            {"message": "Request deleted successfully."},
+            status=status.HTTP_200_OK
         )
 
 
@@ -802,3 +1096,45 @@ def badges_list(request):
     
     serializer = BadgeSerializer(badges, many=True)
     return Response(serializer.data)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def tags_list(request):
+    """
+    Get all unique tags from offers and requests.
+    Returns a list of unique tag names from the database.
+    GET /api/tags/?query=coo (optional query parameter for filtering)
+    """
+    from django.db.models import Q
+    
+    # Get query parameter for filtering tags
+    query = request.query_params.get("query", "").strip().lower()
+    
+    # Get all tags from offers and requests (excluding cancelled posts)
+    offers = Offer.objects.exclude(status="cancelled").exclude(tags__isnull=True).exclude(tags="")
+    requests = RequestModel.objects.exclude(status="cancelled").exclude(tags__isnull=True).exclude(tags="")
+    
+    # Collect all tags
+    all_tags = set()
+    
+    for offer in offers:
+        if offer.tags:
+            # Split comma-separated tags and clean them
+            tags = [tag.strip() for tag in offer.tags.split(",") if tag.strip()]
+            all_tags.update(tags)
+    
+    for req in requests:
+        if req.tags:
+            # Split comma-separated tags and clean them
+            tags = [tag.strip() for tag in req.tags.split(",") if tag.strip()]
+            all_tags.update(tags)
+    
+    # Convert to sorted list
+    unique_tags = sorted(list(all_tags), key=str.lower)
+    
+    # Filter by query if provided
+    if query:
+        unique_tags = [tag for tag in unique_tags if query in tag.lower()]
+    
+    return Response({"tags": unique_tags}, status=status.HTTP_200_OK)

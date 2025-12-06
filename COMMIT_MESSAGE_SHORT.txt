@@ -1,0 +1,14 @@
+feat: Implement email verification system per SRS requirements
+
+- Add email_verified field to UserProfile with migration
+- Require email verification before login/access
+- Secure token-based activation (24h expiry)
+- Email endpoints: activate and resend-activation
+- Frontend: CheckEmail, Activate, ResendActivation components
+- Block unverified users from logging in
+- Console email backend for development, SMTP ready for production
+
+Implements SRS "User Email & Verification" section (lines 72-101).
+
+
+

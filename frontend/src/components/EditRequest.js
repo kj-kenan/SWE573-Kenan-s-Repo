@@ -1,9 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import TagSelector from "./TagSelector";
 
-function CreateService() {
-  const [serviceType, setServiceType] = useState("offer"); // "offer" | "request"
-
+function EditRequest() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -17,10 +19,66 @@ function CreateService() {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
-  // ✅ environment değişkeni + fallback
   const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL ||
     "https://swe573-kenan-s-repo.onrender.com";
+
+  // Load existing request data
+  useEffect(() => {
+    const token = localStorage.getItem("access");
+    if (!token) {
+      setIsError(true);
+      setMessage("Please log in to edit a request.");
+      setLoading(false);
+      return;
+    }
+
+    fetch(`${API_BASE_URL}/api/requests/${id}/`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error("Failed to load request");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        // Populate form with existing data
+        setFormData({
+          title: data.title || "",
+          description: data.description || "",
+          duration: data.duration || "",
+          latitude: data.latitude ? data.latitude.toString() : "",
+          longitude: data.longitude ? data.longitude.toString() : "",
+        });
+
+        // Parse tags
+        if (data.tags) {
+          const tagsArray = data.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
+          setSelectedTags(tagsArray);
+        }
+
+        // Parse available slots
+        if (data.available_slots) {
+          try {
+            const slots = JSON.parse(data.available_slots);
+            setAvailableSlots(Array.isArray(slots) ? slots : []);
+          } catch (e) {
+            setAvailableSlots([]);
+          }
+        }
+
+        setLoading(false);
+      })
+      .catch((err) => {
+        setIsError(true);
+        setMessage("Failed to load request. You may not have permission to edit this request.");
+        setLoading(false);
+        console.error("Error:", err);
+      });
+  }, [id, API_BASE_URL]);
 
   const handleChange = (e) => {
     setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
@@ -55,19 +113,12 @@ function CreateService() {
     setMessage("");
     setIsError(false);
 
-    // Check if user is logged in
     const token = localStorage.getItem("access");
     if (!token) {
       setIsError(true);
-      setMessage("Please log in to create a post.");
+      setMessage("Please log in to edit a request.");
       return;
     }
-
-    // ✅ localhost yerine env tabanlı endpoint
-    const endpoint =
-      serviceType === "offer"
-        ? `${API_BASE_URL}/api/offers/`
-        : `${API_BASE_URL}/api/requests/`;
 
     // Format available slots as JSON array for backend
     const validSlots = availableSlots
@@ -81,8 +132,8 @@ function CreateService() {
     };
 
     try {
-      const res = await fetch(endpoint, {
-        method: "POST",
+      const res = await fetch(`${API_BASE_URL}/api/requests/${id}/edit/`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -94,17 +145,10 @@ function CreateService() {
 
       if (res.ok) {
         setIsError(false);
-        setMessage(`Your ${serviceType} was posted successfully!`);
-        // reset form
-        setFormData({
-          title: "",
-          description: "",
-          duration: "",
-          latitude: "",
-          longitude: "",
-        });
-        setSelectedTags([]);
-        setAvailableSlots([]);
+        setMessage("Request updated successfully! Redirecting...");
+        setTimeout(() => {
+          navigate(`/requests/${id}`);
+        }, 1500);
       } else {
         setIsError(true);
         setMessage(data.detail || data.error || "Something went wrong.");
@@ -112,44 +156,42 @@ function CreateService() {
     } catch (err) {
       setIsError(true);
       setMessage("Server connection error.");
-      console.error("Error posting service:", err);
+      console.error("Error updating request:", err);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-yellow-100 to-amber-200 flex items-center justify-center">
+        <p className="text-xl">Loading request...</p>
+      </div>
+    );
+  }
+
+  if (isError && message.includes("permission")) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-yellow-100 to-amber-200 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 text-xl mb-4">{message}</p>
+          <button
+            onClick={() => navigate(`/requests/${id}`)}
+            className="px-4 py-2 bg-amber-500 text-white rounded hover:bg-amber-600"
+          >
+            Back to Request
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-yellow-100 to-amber-200 flex items-center justify-center py-10">
       <div className="w-full max-w-xl bg-white rounded-2xl shadow-lg border border-amber-200">
         <div className="px-8 pt-8 pb-4">
           <h2 className="text-3xl font-bold text-center mb-6 text-amber-700">
-            {serviceType === "offer" ? "Create an Offer" : "Create a Request"}
+            Edit Request
           </h2>
 
-          <div className="flex justify-center gap-4 mb-6">
-            <button
-              type="button"
-              onClick={() => setServiceType("offer")}
-              className={`px-4 py-2 rounded font-semibold transition ${
-                serviceType === "offer"
-                  ? "bg-amber-500 text-white shadow"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
-            >
-              Offer
-            </button>
-            <button
-              type="button"
-              onClick={() => setServiceType("request")}
-              className={`px-4 py-2 rounded font-semibold transition ${
-                serviceType === "request"
-                  ? "bg-amber-500 text-white shadow"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
-            >
-              Request
-            </button>
-          </div>
-
-          {/* FORM */}
           <form onSubmit={handleSubmit}>
             <input
               type="text"
@@ -263,12 +305,21 @@ function CreateService() {
               </button>
             </div>
 
-            <button
-              type="submit"
-              className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded font-semibold shadow"
-            >
-              Post {serviceType === "offer" ? "Offer" : "Request"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => navigate(`/requests/${id}`)}
+                className="flex-1 py-3 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded font-semibold shadow"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded font-semibold shadow"
+              >
+                Update Request
+              </button>
+            </div>
           </form>
 
           {message && (
@@ -288,4 +339,5 @@ function CreateService() {
   );
 }
 
-export default CreateService;
+export default EditRequest;
+

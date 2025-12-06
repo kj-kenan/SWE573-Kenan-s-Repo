@@ -74,3 +74,5 @@ If you still get errors after running migrations:
 
 The activation link format is: `http://localhost:3000/activate/[token]`
 
+
+

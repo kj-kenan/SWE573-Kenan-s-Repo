@@ -1,0 +1,63 @@
+feat: Implement full email verification system according to SRS
+
+Adds comprehensive email verification functionality as specified in the
+SRS "User Email & Verification" section. Users must now verify their
+email address before accessing authenticated features.
+
+Backend Changes:
+- Add email_verified field to UserProfile model (default: False)
+- Create migration 0010_userprofile_email_verified
+- Implement secure token-based activation using Django's TimestampSigner
+  - Tokens expire after 24 hours
+  - Cryptographically signed for security
+- Add email utilities (email_utils.py):
+  - generate_activation_token() - Creates time-limited activation tokens
+  - validate_activation_token() - Validates and extracts user ID from token
+  - send_activation_email() - Sends HTML email with activation link
+  - send_verification_success_email() - Sends confirmation after verification
+- Update registration endpoint:
+  - Require email address (validated format)
+  - Prevent duplicate emails
+  - Set email_verified=False on registration
+  - Automatically send activation email
+- Add new endpoints:
+  - POST /api/auth/activate/ - Activate account via token
+  - POST /api/auth/resend-activation/ - Request new activation email
+- Block login for unverified users:
+  - Custom JWT token view checks email verification status
+  - Returns 403 with email_not_verified error code
+- Configure email settings with environment variable support
+  - Default: console backend for development (prints to terminal)
+  - Supports SMTP configuration for production
+
+Frontend Changes:
+- Create CheckEmail component - Post-registration confirmation page
+- Create Activate component - Handles activation link with token parameter
+- Create ResendActivation component - Allows requesting new activation email
+- Update Register component:
+  - Make email field required
+  - Redirect to CheckEmail page after successful registration
+- Update Login component:
+  - Handle email_not_verified error (403 status)
+  - Redirect to resend-activation page with helpful message
+- Add routes to App.js:
+  - /check-email - Registration confirmation
+  - /activate/:token - Email activation
+  - /resend-activation - Request new activation link
+- Update Navbar to hide on email verification pages
+
+Error Handling:
+- Improved error messages with detailed logging
+- Graceful handling of email sending failures (registration still succeeds)
+- User-friendly error messages for expired/invalid tokens
+
+Testing Notes:
+- Console email backend enabled by default for development
+- Activation emails print to server console/terminal
+- Production-ready SMTP configuration supported via environment variables
+
+Fixes registration errors and implements full email verification workflow
+as specified in SRS lines 72-101 (User Email & Verification section).
+
+
+
