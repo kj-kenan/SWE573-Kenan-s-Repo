@@ -104,9 +104,19 @@ function Login() {
         <p className="mt-4 text-red-600 font-medium">{message}</p>
       )}
 
+      {/* Forgot Password Link */}
+      <div className="mt-4 text-center">
+        <button
+          onClick={() => navigate("/forgot-password")}
+          className="text-amber-600 font-semibold hover:text-orange-500 transition-colors duration-200 text-sm"
+        >
+          Forgot your password?
+        </button>
+      </div>
+
       {/* 🔸 Register yönlendirmesi */}
       <p className="mt-6 text-gray-600 text-sm">
-        Don’t have an account?{" "}
+        Don't have an account?{" "}
         <button
           onClick={() => navigate("/register")}
           className="text-amber-600 font-semibold hover:text-orange-500 transition-colors duration-200"

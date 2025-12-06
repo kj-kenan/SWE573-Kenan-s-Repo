@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 
-function MapFilters({ onFilterChange, onDistanceChange, userLocation }) {
-  const [isOpen, setIsOpen] = useState(false);
+function ServiceFilters({ onFilterChange, onDistanceChange, userLocation }) {
+  const [isOpen, setIsOpen] = useState(true); // Open by default
   const [selectedTag, setSelectedTag] = useState("");
+  const [postType, setPostType] = useState("all"); // "all", "offers", "requests"
+  const [onlyMyPosts, setOnlyMyPosts] = useState(false);
   const [distance, setDistance] = useState(30); // Default 30 km
   const [minDate, setMinDate] = useState("");
   const [maxDate, setMaxDate] = useState("");
@@ -45,7 +47,6 @@ function MapFilters({ onFilterChange, onDistanceChange, userLocation }) {
   // Load all tags when filter panel opens (for initial suggestions)
   useEffect(() => {
     if (isOpen && selectedTag.length === 0) {
-      // Only fetch all tags if user hasn't typed anything yet
       fetchTagSuggestions("");
     }
   }, [isOpen]);
@@ -86,7 +87,6 @@ function MapFilters({ onFilterChange, onDistanceChange, userLocation }) {
     const newTag = e.target.value;
     setSelectedTag(newTag);
     setShowSuggestions(true);
-    // Don't apply filters automatically - wait for Apply button
   };
 
   const handleTagSelect = (tag) => {
@@ -103,29 +103,17 @@ function MapFilters({ onFilterChange, onDistanceChange, userLocation }) {
   const handleDistanceChange = (e) => {
     const newDistance = parseInt(e.target.value);
     setDistance(newDistance);
-    // Update circle radius immediately (for visual preview while dragging slider)
     if (onDistanceChange && userLocation) {
       onDistanceChange(newDistance);
     }
-    // Don't apply filters automatically - wait for Apply button
-  };
-
-  const handleMinDateChange = (e) => {
-    const newMinDate = e.target.value;
-    setMinDate(newMinDate);
-    // Don't apply filters automatically - wait for Apply button
-  };
-
-  const handleMaxDateChange = (e) => {
-    const newMaxDate = e.target.value;
-    setMaxDate(newMaxDate);
-    // Don't apply filters automatically - wait for Apply button
   };
 
   const handleApply = () => {
     if (onFilterChange) {
       onFilterChange({
         tag: selectedTag || null,
+        postType: postType,
+        onlyMyPosts: onlyMyPosts,
         distance: distance || null,
         minDate: minDate || null,
         maxDate: maxDate || null,
@@ -137,18 +125,20 @@ function MapFilters({ onFilterChange, onDistanceChange, userLocation }) {
 
   const clearFilters = () => {
     setSelectedTag("");
+    setPostType("all");
+    setOnlyMyPosts(false);
     setDistance(30);
     setMinDate("");
     setMaxDate("");
     setShowSuggestions(false);
-    // Update circle radius when clearing
     if (onDistanceChange && userLocation) {
       onDistanceChange(30);
     }
-    // Apply cleared filters immediately
     if (onFilterChange) {
       onFilterChange({
         tag: null,
+        postType: "all",
+        onlyMyPosts: false,
         distance: 30,
         minDate: null,
         maxDate: null,
@@ -158,43 +148,73 @@ function MapFilters({ onFilterChange, onDistanceChange, userLocation }) {
   };
 
   return (
-    <>
-      <style>{`
-        .map-filter-input::placeholder {
-          color: #8B7355;
-          opacity: 0.75;
-        }
-        .map-filter-input:-ms-input-placeholder {
-          color: #8B7355;
-          opacity: 0.75;
-        }
-        .map-filter-input::-ms-input-placeholder {
-          color: #8B7355;
-          opacity: 0.75;
-        }
-      `}</style>
-      <div 
-        className="mb-4 p-4"
-        style={{
-          backgroundColor: '#FFF3D4',
-          border: '1px solid #E2C897',
-          borderRadius: '14px',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
-        }}
-      >
+    <div className="mb-6 rounded-xl shadow-md p-4 border border-amber-200" style={{ backgroundColor: '#FFF8E6' }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex justify-between items-center text-left font-semibold text-amber-700 hover:text-amber-900"
+                className="w-full flex justify-between items-center text-left font-semibold hover:text-amber-900 mb-2" style={{ color: '#333' }}
       >
-        <span>🔍 Map Filters</span>
+        <span>🔍 Filters</span>
         <span>{isOpen ? "▼" : "▶"}</span>
       </button>
 
       {isOpen && (
         <div className="mt-4 space-y-4">
+          {/* Post Type Selector */}
+          <div>
+            <label className="block text-sm font-semibold mb-2" style={{ color: '#333' }}>
+              Post Type
+            </label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPostType("all")}
+                className={`flex-1 py-2 rounded font-semibold transition ${
+                  postType === "all"
+                    ? "bg-amber-500 text-white shadow"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setPostType("offers")}
+                className={`flex-1 py-2 rounded font-semibold transition ${
+                  postType === "offers"
+                    ? "bg-amber-500 text-white shadow"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+              >
+                Offers
+              </button>
+              <button
+                onClick={() => setPostType("requests")}
+                className={`flex-1 py-2 rounded font-semibold transition ${
+                  postType === "requests"
+                    ? "bg-amber-500 text-white shadow"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+              >
+                Requests
+              </button>
+            </div>
+          </div>
+
+          {/* Only My Posts Toggle */}
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="onlyMyPosts"
+              checked={onlyMyPosts}
+              onChange={(e) => setOnlyMyPosts(e.target.checked)}
+              className="w-4 h-4 text-amber-500 border-amber-300 rounded focus:ring-amber-400"
+            />
+            <label htmlFor="onlyMyPosts" className="text-sm font-semibold" style={{ color: '#333' }}>
+              Show only my posts
+            </label>
+          </div>
+
           {/* Tag Filter with Autocomplete */}
           <div className="relative">
-            <label className="block text-sm font-semibold text-amber-700 mb-2">
+            <label className="block text-sm font-semibold mb-2" style={{ color: '#333' }}>
               Filter by Tag
             </label>
             <div className="relative">
@@ -205,16 +225,7 @@ function MapFilters({ onFilterChange, onDistanceChange, userLocation }) {
                 onChange={handleTagChange}
                 onFocus={handleTagFocus}
                 placeholder="Type tag name (e.g., Cooking, Tutoring, Gardening)"
-                className="map-filter-input w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
-                style={{
-                  borderColor: '#D9B878'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.borderColor = '#C1923E';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.borderColor = '#D9B878';
-                }}
+                className="w-full p-2 border border-amber-300 rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
               {isLoadingTags && (
                 <div className="absolute right-2 top-2 text-gray-400 text-xs">
@@ -224,11 +235,7 @@ function MapFilters({ onFilterChange, onDistanceChange, userLocation }) {
               {showSuggestions && tagSuggestions.length > 0 && (
                 <div
                   ref={suggestionsRef}
-                  className="absolute z-50 w-full mt-1 border rounded-lg shadow-lg max-h-60 overflow-y-auto"
-                  style={{
-                    backgroundColor: '#FFF3D4',
-                    borderColor: '#E2C897'
-                  }}
+                  className="absolute z-50 w-full mt-1 border border-amber-200 rounded-xl shadow-lg max-h-60 overflow-y-auto" style={{ backgroundColor: '#FFF8E6' }}
                 >
                   {tagSuggestions.map((tag, index) => (
                     <button
@@ -248,11 +255,7 @@ function MapFilters({ onFilterChange, onDistanceChange, userLocation }) {
                 !isLoadingTags && (
                   <div
                     ref={suggestionsRef}
-                    className="absolute z-50 w-full mt-1 border rounded-lg shadow-lg p-4 text-sm text-gray-500"
-                    style={{
-                      backgroundColor: '#FFF3D4',
-                      borderColor: '#E2C897'
-                    }}
+                    className="absolute z-50 w-full mt-1 border border-amber-200 rounded-xl shadow-lg p-4 text-sm text-gray-500" style={{ backgroundColor: '#FFF8E6' }}
                   >
                     No matching tags found
                   </div>
@@ -268,7 +271,7 @@ function MapFilters({ onFilterChange, onDistanceChange, userLocation }) {
           {/* Distance Filter */}
           {userLocation && (
             <div>
-              <label className="block text-sm font-semibold text-amber-700 mb-2">
+              <label className="block text-sm font-semibold mb-2" style={{ color: '#333' }}>
                 Distance: {distance} km from your location
               </label>
               <input
@@ -295,45 +298,27 @@ function MapFilters({ onFilterChange, onDistanceChange, userLocation }) {
           )}
 
           {/* Date Range Filter */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-amber-700 mb-2">
+              <label className="block text-sm font-semibold mb-2" style={{ color: '#333' }}>
                 From Date
               </label>
               <input
                 type="date"
                 value={minDate}
-                onChange={handleMinDateChange}
-                className="map-filter-input w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
-                style={{
-                  borderColor: '#D9B878'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.borderColor = '#C1923E';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.borderColor = '#D9B878';
-                }}
+                onChange={(e) => setMinDate(e.target.value)}
+                className="w-full p-2 border border-amber-300 rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-amber-700 mb-2">
+              <label className="block text-sm font-semibold mb-2" style={{ color: '#333' }}>
                 To Date
               </label>
               <input
                 type="date"
                 value={maxDate}
-                onChange={handleMaxDateChange}
-                className="map-filter-input w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
-                style={{
-                  borderColor: '#D9B878'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.borderColor = '#C1923E';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.borderColor = '#D9B878';
-                }}
+                onChange={(e) => setMaxDate(e.target.value)}
+                className="w-full p-2 border border-amber-300 rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
             </div>
           </div>
@@ -342,21 +327,11 @@ function MapFilters({ onFilterChange, onDistanceChange, userLocation }) {
           <div className="flex gap-2">
             <button
               onClick={handleApply}
-              className="flex-1 py-2 text-white rounded font-semibold transition"
-              style={{
-                backgroundColor: '#E0A63C',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#CC922F';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = '#E0A63C';
-              }}
+              className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded font-semibold transition"
             >
               Apply Filters
             </button>
-            {(selectedTag || distance !== 30 || minDate || maxDate) && (
+            {(selectedTag || postType !== "all" || onlyMyPosts || distance !== 30 || minDate || maxDate) && (
               <button
                 onClick={clearFilters}
                 className="flex-1 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded font-semibold transition"
@@ -368,8 +343,8 @@ function MapFilters({ onFilterChange, onDistanceChange, userLocation }) {
         </div>
       )}
     </div>
-    </>
   );
 }
 
-export default MapFilters;
+export default ServiceFilters;
+

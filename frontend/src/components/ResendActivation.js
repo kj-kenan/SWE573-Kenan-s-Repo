@@ -41,8 +41,8 @@ function ResendActivation() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email: email || undefined,
-          username: username || undefined,
+          ...(email && { email: email.trim() }),
+          ...(username && { username: username.trim() }),
         }),
       });
 

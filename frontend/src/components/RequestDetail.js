@@ -402,6 +402,49 @@ function RequestDetail() {
     }
   };
 
+  const handleConfirmCompletion = async (handshakeId, isProvider) => {
+    const token = localStorage.getItem("access");
+    if (!token) {
+      setMessage("Please log in.");
+      return;
+    }
+
+    const endpoint = isProvider
+      ? `${API_BASE_URL}/api/handshakes/${handshakeId}/confirm-provider/`
+      : `${API_BASE_URL}/api/handshakes/${handshakeId}/confirm-seeker/`;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Update request state with new handshake data if available
+        if (data.handshake) {
+          setRequest((prevRequest) => ({
+            ...prevRequest,
+            active_handshake: data.handshake,
+          }));
+        } else {
+          // Reload the request to get updated data
+          window.location.reload();
+        }
+        setMessage(data.message || "Confirmation recorded!");
+      } else {
+        setMessage(data.error || "Failed to confirm completion.");
+      }
+    } catch (err) {
+      setMessage("Network error. Please try again.");
+      console.error("Error:", err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-yellow-50 flex items-center justify-center">
@@ -444,6 +487,21 @@ function RequestDetail() {
     !activeHandshake && 
     request.status === "open"
   );
+  
+  // Determine if user can confirm completion (provider or seeker who hasn't confirmed yet)
+  const canConfirmCompletion = activeHandshake && 
+    (activeHandshake.status === "accepted" || activeHandshake.status === "in_progress") &&
+    activeHandshake.status !== "completed" && currentUser && (() => {
+      const isProvider = activeHandshake.provider_username && 
+        activeHandshake.provider_username.toLowerCase() === currentUser.toLowerCase();
+      const isSeeker = activeHandshake.seeker_username && 
+        activeHandshake.seeker_username.toLowerCase() === currentUser.toLowerCase();
+      return (isProvider && !activeHandshake.provider_confirmed) ||
+             (isSeeker && !activeHandshake.seeker_confirmed);
+    })();
+  
+  const isProvider = activeHandshake && activeHandshake.provider_username && currentUser &&
+    activeHandshake.provider_username.toLowerCase() === currentUser.toLowerCase();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-yellow-100 to-amber-200 py-10">
@@ -458,27 +516,48 @@ function RequestDetail() {
         <div className="bg-white rounded-2xl shadow-lg p-8">
           <div className="flex justify-between items-start mb-4">
             <h1 className="text-4xl font-bold text-amber-700">{request.title}</h1>
-            {isOwner && (
-              <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              {/* Confirm Completion Button - Top Right */}
+              {canConfirmCompletion && (
                 <button
-                  onClick={() => navigate(`/requests/${id}/edit`)}
-                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                  onClick={() => handleConfirmCompletion(activeHandshake.id, isProvider)}
+                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm font-medium transition-colors"
                 >
-                  Edit
+                  Confirm Completion
                 </button>
-                <button
-                  onClick={handleDelete}
-                  className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
-                >
-                  Delete
-                </button>
-              </div>
-            )}
+              )}
+              {isOwner && (
+                <>
+                  <button
+                    onClick={() => navigate(`/requests/${id}/edit`)}
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
+                  >
+                    Delete
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="mb-6">
             <p className="text-gray-600 mb-2">
-              <span className="font-semibold">Posted by:</span> {request.username || "Unknown"}
+              <span className="font-semibold">Posted by:</span>{" "}
+              {request.user ? (
+                <span
+                  className="text-amber-700 hover:text-amber-900 cursor-pointer underline font-semibold"
+                  onClick={() => navigate(`/profile/${request.user}`)}
+                >
+                  {request.username || "Unknown"}
+                </span>
+              ) : (
+                request.username || "Unknown"
+              )}
             </p>
             <p className="text-gray-600 mb-2">
               <span className="font-semibold">Status:</span>{" "}
@@ -491,7 +570,7 @@ function RequestDetail() {
                     : "bg-gray-100 text-gray-800"
                 }`}
               >
-                {request.status}
+                {request.status === "open" ? "Open" : request.status === "in_progress" ? "In Progress" : request.status}
               </span>
             </p>
             {request.created_at && (
@@ -570,11 +649,61 @@ function RequestDetail() {
                   Active Handshake ({activeHandshake.status})
                 </p>
                 <p className="text-sm text-gray-600 mb-2">
-                  Seeker: {activeHandshake.seeker_username || "Anonymous"}
+                  Provider:{" "}
+                  {activeHandshake.provider ? (
+                    <span
+                      className="text-amber-700 hover:text-amber-900 cursor-pointer underline font-semibold"
+                      onClick={() => navigate(`/profile/${activeHandshake.provider}`)}
+                    >
+                      {activeHandshake.provider_username || "Anonymous"}
+                    </span>
+                  ) : (
+                    activeHandshake.provider_username || "Anonymous"
+                  )}
+                </p>
+                <p className="text-sm text-gray-600 mb-2">
+                  Seeker:{" "}
+                  {activeHandshake.seeker ? (
+                    <span
+                      className="text-amber-700 hover:text-amber-900 cursor-pointer underline font-semibold"
+                      onClick={() => navigate(`/profile/${activeHandshake.seeker}`)}
+                    >
+                      {activeHandshake.seeker_username || "Anonymous"}
+                    </span>
+                  ) : (
+                    activeHandshake.seeker_username || "Anonymous"
+                  )}
                 </p>
                 <p className="text-sm text-gray-600 mb-2">
                   Hours: {activeHandshake.hours}
                 </p>
+                
+                {/* Confirmation Status */}
+                {(activeHandshake.status === "accepted" || activeHandshake.status === "in_progress") && (
+                  <div className="mb-3 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700">
+                        <strong>Provider:</strong>{" "}
+                        {activeHandshake.provider_confirmed ? (
+                          <span className="text-green-600">✓ Confirmed</span>
+                        ) : (
+                          <span className="text-gray-500">Pending</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700">
+                        <strong>Seeker:</strong>{" "}
+                        {activeHandshake.seeker_confirmed ? (
+                          <span className="text-green-600">✓ Confirmed</span>
+                        ) : (
+                          <span className="text-gray-500">Pending</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Show accept/decline buttons for owner when handshake is proposed */}
                 {isOwner && activeHandshake.status === "proposed" && (
                   <div className="flex gap-2 mt-4">
@@ -592,8 +721,37 @@ function RequestDetail() {
                     </button>
                   </div>
                 )}
+
+                {/* Waiting message if user confirmed but partner hasn't */}
+                {(activeHandshake.status === "accepted" || activeHandshake.status === "in_progress") && 
+                 activeHandshake.status !== "completed" && (() => {
+                  const isProvider = activeHandshake.provider_username && currentUser &&
+                    activeHandshake.provider_username.toLowerCase() === currentUser.toLowerCase();
+                  const isSeeker = activeHandshake.seeker_username && currentUser &&
+                    activeHandshake.seeker_username.toLowerCase() === currentUser.toLowerCase();
+                  
+                  if ((isProvider && activeHandshake.provider_confirmed && !activeHandshake.seeker_confirmed) ||
+                      (isSeeker && activeHandshake.seeker_confirmed && !activeHandshake.provider_confirmed)) {
+                    return (
+                      <p className="text-sm text-amber-600 mt-2 font-medium">
+                        ⏳ Waiting for partner to confirm...
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {/* Completed Status */}
+                {activeHandshake.status === "completed" && (
+                  <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <p className="text-sm text-green-700 font-medium">
+                      ✓ Service Completed! Beellars have been transferred.
+                    </p>
+                  </div>
+                )}
+
                 {/* Show chat button only for owner or accepted partner */}
-                {activeHandshake.status !== "proposed" && (
+                {activeHandshake.status !== "proposed" && activeHandshake.status !== "completed" && (
                   (isOwner || 
                    (activeHandshake.seeker_username && currentUser && 
                     activeHandshake.seeker_username.toLowerCase() === currentUser.toLowerCase()) ||
@@ -625,12 +783,12 @@ function RequestDetail() {
             {message && (
               <p
                 className={`mt-4 ${
-                  message.includes("success") || message.includes("accepted")
+                  message.includes("success") || message.includes("accepted") || message.includes("Completed")
                     ? "text-green-600"
                     : "text-red-600"
                 }`}
               >
-                {message}
+                {message.includes("Service Completed") ? "" : message}
               </p>
             )}
           </div>
@@ -652,7 +810,17 @@ function RequestDetail() {
                 {questions.map((q) => (
                   <div key={q.id} className="bg-gray-50 p-4 rounded-lg">
                     <p className="font-semibold text-sm text-gray-600 mb-1">
-                      {q.author_username} asked:
+                      {q.author ? (
+                        <span
+                          className="text-amber-700 hover:text-amber-900 cursor-pointer underline"
+                          onClick={() => navigate(`/profile/${q.author}`)}
+                        >
+                          {q.author_username}
+                        </span>
+                      ) : (
+                        q.author_username
+                      )}{" "}
+                      asked:
                     </p>
                     <p className="text-gray-800 mb-2">{q.content}</p>
                     {q.answer ? (
@@ -770,7 +938,16 @@ function RequestDetail() {
                               : "bg-white text-gray-800 max-w-[80%]"
                           }`}
                         >
-                          <p className="text-xs opacity-75 mb-1">{msg.sender_username}</p>
+                          <p
+                            className="text-xs opacity-75 mb-1 cursor-pointer hover:underline"
+                            onClick={() => {
+                              if (msg.sender) {
+                                navigate(`/profile/${msg.sender}`);
+                              }
+                            }}
+                          >
+                            {msg.sender_username}
+                          </p>
                           <p>{msg.content}</p>
                           <p className="text-xs opacity-75 mt-1">
                             {new Date(msg.created_at).toLocaleTimeString()}

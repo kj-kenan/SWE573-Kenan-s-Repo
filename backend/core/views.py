@@ -10,7 +10,7 @@ from django.db import models
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 
-from .models import UserProfile, Offer, Request as RequestModel, Handshake, Transaction, Question, Message, Rating, Badge
+from .models import UserProfile, Offer, Request as RequestModel, Handshake, Transaction, Question, Message, Rating, Badge, ForumTopic, ForumReply
 from .serializers import (
     UserProfileSerializer,
     OfferSerializer,
@@ -21,8 +21,10 @@ from .serializers import (
     MessageSerializer,
     RatingSerializer,
     BadgeSerializer,
+    ForumTopicSerializer,
+    ForumReplySerializer,
 )
-from .email_utils import send_activation_email
+from .email_utils import send_activation_email, send_password_reset_email, validate_password_reset_token
 
 # ---------------------------------------------------------------------------
 # BASIC ROUTES
@@ -172,45 +174,89 @@ def resend_activation(request):
     Resend activation email to user.
     POST /api/auth/resend-activation/ with body: {"email": "..."} or {"username": "..."}
     """
-    email = request.data.get("email")
-    username = request.data.get("username")
+    email = request.data.get("email", "").strip() if request.data.get("email") else None
+    username = request.data.get("username", "").strip() if request.data.get("username") else None
     
     if not email and not username:
         return Response({"error": "Email or username is required"}, status=status.HTTP_400_BAD_REQUEST)
     
     try:
         if email:
+            print(f"🔍 Looking up user by email: {email}")
             user = User.objects.get(email=email)
         else:
+            print(f"🔍 Looking up user by username: {username}")
             user = User.objects.get(username=username)
+        print(f"✅ User found: {user.username} (ID: {user.id})")
     except User.DoesNotExist:
         # Don't reveal whether user exists for security reasons
+        print(f"⚠️ User not found (email: {email}, username: {username}) - returning generic message for security")
         return Response({
             "message": "If an account with that email/username exists, an activation email has been sent."
         }, status=status.HTTP_200_OK)
+    except User.MultipleObjectsReturned:
+        # Handle case where multiple users might have the same email (shouldn't happen but handle it)
+        print(f"❌ Multiple users found with email: {email}")
+        if email:
+            user = User.objects.filter(email=email).first()
+        else:
+            user = User.objects.filter(username=username).first()
+        print(f"Using first user: {user.username} (ID: {user.id})")
     
     # Check if already verified
     try:
         profile = user.profile
+        print(f"📋 Profile found for user {user.username}")
         if profile.email_verified:
+            print(f"✅ User {user.username} already verified - skipping email send")
             return Response({
                 "message": "Email is already verified. You can log in.",
                 "already_verified": True
             }, status=status.HTTP_200_OK)
+        print(f"⏳ User {user.username} not verified - will send activation email")
     except UserProfile.DoesNotExist:
         # Create profile if it doesn't exist
+        print(f"📋 Creating profile for user {user.username}")
         profile = UserProfile.objects.create(user=user, timebank_balance=3, email_verified=False)
     
-    # Resend activation email
-    email_sent = send_activation_email(user, request)
+    # Validate user has an email address
+    if not user.email:
+        return Response({
+            "error": "User account does not have an email address. Cannot send activation email."
+        }, status=status.HTTP_400_BAD_REQUEST)
     
-    if email_sent:
+    # Resend activation email
+    print(f"\n{'='*60}")
+    print(f"🔄 RESENDING ACTIVATION EMAIL")
+    print(f"{'='*60}")
+    print(f"User ID: {user.id}")
+    print(f"Username: {user.username}")
+    print(f"Email: {user.email}")
+    print(f"Email Verified: {profile.email_verified}")
+    print(f"{'='*60}\n")
+    
+    try:
+        email_sent = send_activation_email(user, request)
+        
+        print(f"\n{'='*60}")
+        print(f"Email send result: {email_sent}")
+        print(f"{'='*60}\n")
+        
+        if email_sent:
+            return Response({
+                "message": "Activation email has been sent. Please check your inbox (or console if using console backend)."
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                "error": "Failed to send activation email. Please try again later.",
+                "details": "Check server console logs for details."
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        import traceback
+        print(f"\n❌ EXCEPTION in resend_activation:")
+        traceback.print_exc()
         return Response({
-            "message": "Activation email has been sent. Please check your inbox."
-        }, status=status.HTTP_200_OK)
-    else:
-        return Response({
-            "error": "Failed to send activation email. Please try again later."
+            "error": f"Error sending activation email: {str(e)}"
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -226,6 +272,111 @@ def login_user(request):
     return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
 
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def password_reset_request(request):
+    """
+    Request password reset.
+    POST /api/auth/password-reset-request/ with body: {"email": "..."}
+    Always returns success to avoid email enumeration.
+    """
+    email = request.data.get("email", "").strip()
+    
+    if not email:
+        return Response({
+            "message": "If an account with that email exists, a password reset email has been sent."
+        }, status=status.HTTP_200_OK)
+    
+    try:
+        user = User.objects.get(email=email)
+        # Send password reset email
+        email_sent = send_password_reset_email(user, request)
+        print(f"Password reset email {'sent' if email_sent else 'failed'} for user: {user.username}")
+    except User.DoesNotExist:
+        # Don't reveal whether user exists
+        pass
+    except User.MultipleObjectsReturned:
+        # Handle multiple users with same email (shouldn't happen but handle it)
+        user = User.objects.filter(email=email).first()
+        if user:
+            email_sent = send_password_reset_email(user, request)
+            print(f"Password reset email {'sent' if email_sent else 'failed'} for user: {user.username}")
+    
+    # Always return success to avoid email enumeration
+    return Response({
+        "message": "If an account with that email exists, a password reset email has been sent."
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def password_reset_verify(request, token):
+    """
+    Verify password reset token.
+    GET /api/auth/password-reset-verify/<token>/
+    """
+    is_valid, user_id, error_message = validate_password_reset_token(token)
+    
+    if is_valid:
+        return Response({
+            "valid": True,
+            "message": "Token is valid."
+        }, status=status.HTTP_200_OK)
+    else:
+        return Response({
+            "valid": False,
+            "error": error_message or "Invalid or expired token."
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def password_reset_confirm(request):
+    """
+    Confirm password reset and set new password.
+    POST /api/auth/password-reset-confirm/ with body: {"token": "...", "new_password": "..."}
+    """
+    token = request.data.get("token")
+    new_password = request.data.get("new_password")
+    
+    if not token or not new_password:
+        return Response({
+            "error": "Token and new_password are required."
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Validate password strength (basic validation)
+    if len(new_password) < 8:
+        return Response({
+            "error": "Password must be at least 8 characters long."
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Validate token
+    is_valid, user_id, error_message = validate_password_reset_token(token)
+    
+    if not is_valid:
+        return Response({
+            "error": error_message or "Invalid or expired token."
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        user = User.objects.get(pk=user_id)
+        # Set new password
+        user.set_password(new_password)
+        user.save()
+        
+        return Response({
+            "message": "Password has been reset successfully. You can now log in with your new password."
+        }, status=status.HTTP_200_OK)
+    except User.DoesNotExist:
+        return Response({
+            "error": "User not found."
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            "error": f"Error resetting password: {str(e)}"
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def profile_list(request):
@@ -233,6 +384,39 @@ def profile_list(request):
     profiles = UserProfile.objects.filter(is_visible=True)
     serializer = UserProfileSerializer(profiles, many=True, context={"request": request})
     return Response(serializer.data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def public_profile_view(request, user_id):
+    """
+    Get public profile information for a user.
+    GET /api/users/<id>/public/
+    Returns only public information (no email, beellars, etc.)
+    """
+    try:
+        target_user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response(
+            {"error": "User not found."}, status=status.HTTP_404_NOT_FOUND
+        )
+    
+    try:
+        profile = UserProfile.objects.get(user=target_user)
+    except UserProfile.DoesNotExist:
+        return Response(
+            {"error": "Profile not found."}, status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Check if profile is visible (unless viewing own profile)
+    if profile.user != request.user and not profile.is_visible:
+        return Response(
+            {"error": "This profile is not visible."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    
+    serializer = PublicProfileSerializer(profile, context={"request": request})
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(["GET", "PUT", "PATCH"])
@@ -309,7 +493,7 @@ def offers_list_create(request):
             from .location_utils import calculate_distance_km, get_fuzzy_coordinates
             
             # Filter out cancelled (deleted) offers
-            offers = Offer.objects.exclude(status="cancelled")
+            offers = Offer.objects.exclude(status="cancelled").exclude(status="completed")
             
             # Filter by tag
             tag = request.query_params.get("tag", None)
@@ -499,7 +683,7 @@ def requests_list_create(request):
             from .location_utils import calculate_distance_km, get_fuzzy_coordinates
             
             # Filter out cancelled (deleted) requests
-            requests = RequestModel.objects.exclude(status="cancelled")
+            requests = RequestModel.objects.exclude(status="cancelled").exclude(status="completed")
             
             # Filter by tag
             tag = request.query_params.get("tag", None)
@@ -713,6 +897,7 @@ def handshake_accept(request, handshake_id):
     handshake.status = "accepted"
     handshake.save()
 
+    # Mark post as "in_progress" (status already updated to "in_progress" in the accept endpoint)
     if handshake.offer:
         handshake.offer.status = "in_progress"
         handshake.offer.save()
@@ -737,48 +922,210 @@ def handshake_decline(request, handshake_id):
     return Response({"message": "Handshake declined."}, status=status.HTTP_200_OK)
 
 
-@api_view(["PATCH"])
+def _complete_handshake(handshake):
+    """
+    Helper function to handle handshake completion:
+    - Transfer Beellars
+    - Create transaction record
+    - Mark post as completed
+    - Update handshake status
+    
+    Note: Both provider_confirmed and seeker_confirmed should already be True
+    when this function is called.
+    """
+    hours = handshake.hours
+    provider_profile = handshake.provider.profile
+    seeker_profile = handshake.seeker.profile
+
+    # Check sufficient balance before transfer
+    if seeker_profile.timebank_balance < hours:
+        return False, "Insufficient Beellar balance."
+
+    # Transfer Beellars (provider earns, seeker spends)
+    seeker_profile.timebank_balance -= hours
+    provider_profile.timebank_balance += hours
+    seeker_profile.save()
+    provider_profile.save()
+
+    # Create transaction record
+    Transaction.objects.create(
+        handshake=handshake,
+        sender=handshake.seeker,
+        receiver=handshake.provider,
+        amount=hours,
+    )
+
+    # Mark post as completed (inactive)
+    if handshake.offer:
+        handshake.offer.status = "completed"
+        handshake.offer.save()
+    elif handshake.request:
+        handshake.request.status = "completed"
+        handshake.request.save()
+
+    # Mark handshake as completed
+    # Note: The model's save() method will also set status="completed" when both confirm
+    # but we explicitly set it here to ensure it's done after the transfer
+    handshake.status = "completed"
+    handshake.save()
+
+    return True, "Handshake completed successfully. Beellars transferred."
+
+
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def handshake_confirm(request, handshake_id):
+def handshake_confirm_provider(request, handshake_id):
+    """Provider confirms service completion"""
     handshake = get_object_or_404(Handshake, pk=handshake_id)
     user = request.user
 
-    if user not in [handshake.provider, handshake.seeker]:
-        return Response({"error": "You are not part of this handshake."}, status=status.HTTP_403_FORBIDDEN)
-
-    if user == handshake.provider:
-        handshake.provider_confirmed = True
-    elif user == handshake.seeker:
-        handshake.seeker_confirmed = True
-
-    if handshake.provider_confirmed and handshake.seeker_confirmed:
-        handshake.status = "completed"
-        hours = handshake.hours
-        provider_profile = handshake.provider.profile
-        seeker_profile = handshake.seeker.profile
-
-        if seeker_profile.timebank_balance < hours:
-            return Response({"error": "Insufficient Beellar balance."}, status=status.HTTP_400_BAD_REQUEST)
-
-        seeker_profile.timebank_balance -= hours
-        provider_profile.timebank_balance += hours
-        seeker_profile.save()
-        provider_profile.save()
-
-        Transaction.objects.create(
-            handshake=handshake,
-            sender=handshake.seeker,
-            receiver=handshake.provider,
-            amount=hours,
+    # Check user is the provider
+    if user != handshake.provider:
+        return Response(
+            {"error": "Only the provider can confirm from this endpoint."},
+            status=status.HTTP_403_FORBIDDEN
         )
 
-    handshake.save()
-    return Response(HandshakeSerializer(handshake).data, status=status.HTTP_200_OK)
+    # Check handshake is in a valid state
+    if handshake.status not in ["accepted", "in_progress"]:
+        return Response(
+            {"error": "Handshake must be accepted or in progress to confirm completion."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Check if already confirmed
+    if handshake.provider_confirmed:
+        return Response(
+            {"error": "Provider has already confirmed completion."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Check if handshake is already completed
+    if handshake.status == "completed":
+        return Response(
+            {"error": "Handshake is already completed."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Set provider confirmation (don't save yet - we'll check completion first)
+    handshake.provider_confirmed = True
+
+    # Check if both sides have confirmed BEFORE saving
+    both_confirmed = handshake.provider_confirmed and handshake.seeker_confirmed
+
+    if both_confirmed:
+        # Complete the handshake (this will handle transfer, transaction, and marking post as completed)
+        success, message = _complete_handshake(handshake)
+        if not success:
+            # Rollback confirmation if transfer fails
+            handshake.provider_confirmed = False
+            handshake.save()
+            return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "message": "Service completed! Beellars have been transferred.",
+            "handshake": HandshakeSerializer(handshake).data
+        }, status=status.HTTP_200_OK)
+    else:
+        # Only one side confirmed, just save the confirmation
+        handshake.save()  # Model's save() won't trigger completion since both aren't confirmed
+        return Response({
+            "message": "Provider confirmation recorded. Waiting for seeker to confirm...",
+            "handshake": HandshakeSerializer(handshake).data
+        }, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def handshake_confirm_seeker(request, handshake_id):
+    """Seeker confirms service completion"""
+    handshake = get_object_or_404(Handshake, pk=handshake_id)
+    user = request.user
+
+    # Check user is the seeker
+    if user != handshake.seeker:
+        return Response(
+            {"error": "Only the seeker can confirm from this endpoint."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Check handshake is in a valid state
+    if handshake.status not in ["accepted", "in_progress"]:
+        return Response(
+            {"error": "Handshake must be accepted or in progress to confirm completion."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Check if already confirmed
+    if handshake.seeker_confirmed:
+        return Response(
+            {"error": "Seeker has already confirmed completion."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Check if handshake is already completed
+    if handshake.status == "completed":
+        return Response(
+            {"error": "Handshake is already completed."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Set seeker confirmation (don't save yet - we'll check completion first)
+    handshake.seeker_confirmed = True
+
+    # Check if both sides have confirmed BEFORE saving
+    both_confirmed = handshake.provider_confirmed and handshake.seeker_confirmed
+
+    if both_confirmed:
+        # Complete the handshake (this will handle transfer, transaction, and marking post as completed)
+        success, message = _complete_handshake(handshake)
+        if not success:
+            # Rollback confirmation if transfer fails
+            handshake.seeker_confirmed = False
+            handshake.save()
+            return Response({"error": message}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "message": "Service completed! Beellars have been transferred.",
+            "handshake": HandshakeSerializer(handshake).data
+        }, status=status.HTTP_200_OK)
+    else:
+        # Only one side confirmed, just save the confirmation
+        handshake.save()  # Model's save() won't trigger completion since both aren't confirmed
+        return Response({
+            "message": "Seeker confirmation recorded. Waiting for provider to confirm...",
+            "handshake": HandshakeSerializer(handshake).data
+        }, status=status.HTTP_200_OK)
 
 
 # ---------------------------------------------------------------------------
 # TRANSACTION HISTORY & BALANCE
 # ---------------------------------------------------------------------------
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def timebank_view(request):
+    """
+    Unified endpoint returning both balance and transaction history.
+    GET /api/timebank/
+    Returns: {balance: int, transactions: []}
+    """
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+    if created:
+        # Set starting balance for newly created profile
+        profile.timebank_balance = 3
+        profile.save()
+    
+    # Get transaction history (sorted newest → oldest)
+    transactions = Transaction.objects.filter(
+        models.Q(sender=request.user) | models.Q(receiver=request.user)
+    ).order_by("-created_at")
+    
+    serializer = TransactionSerializer(transactions, many=True, context={"request": request})
+    
+    return Response({
+        "balance": profile.timebank_balance,
+        "transactions": serializer.data
+    })
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -795,10 +1142,23 @@ def timebank_balance(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def transactions_list(request):
-    """Get transaction history for the logged-in user"""
-    transactions = Transaction.objects.filter(
-        models.Q(sender=request.user) | models.Q(receiver=request.user)
-    ).order_by("-created_at")
+    """
+    Get transaction history for the logged-in user.
+    Admins can view all transactions by passing ?all=true
+    """
+    # Check if user is admin and wants to see all transactions
+    is_admin = request.user.is_staff or request.user.is_superuser
+    show_all = request.query_params.get("all", "false").lower() == "true"
+    
+    if is_admin and show_all:
+        # Admin viewing all transactions
+        transactions = Transaction.objects.all().order_by("-created_at")
+    else:
+        # Regular user or admin viewing own transactions
+        transactions = Transaction.objects.filter(
+            models.Q(sender=request.user) | models.Q(receiver=request.user)
+        ).order_by("-created_at")
+    
     serializer = TransactionSerializer(transactions, many=True, context={"request": request})
     return Response(serializer.data)
 
@@ -1005,14 +1365,14 @@ def ratings_list_create(request):
             from .models import UserProfile
             try:
                 profile = UserProfile.objects.get(pk=user_id)
-                ratings = Rating.objects.filter(rated_user=profile.user)
+                ratings = Rating.objects.filter(ratee=profile.user)
             except UserProfile.DoesNotExist:
                 ratings = Rating.objects.none()
         elif username:
             # Filter by username
             try:
                 user = User.objects.get(username=username)
-                ratings = Rating.objects.filter(rated_user=user)
+                ratings = Rating.objects.filter(ratee=user)
             except User.DoesNotExist:
                 ratings = Rating.objects.none()
         else:
@@ -1030,38 +1390,6 @@ def ratings_list_create(request):
     
     serializer = RatingSerializer(data=request.data)
     if serializer.is_valid():
-        handshake = serializer.validated_data.get("handshake")
-        rated_user = serializer.validated_data.get("rated_user")
-        
-        # Validate handshake is completed
-        if handshake.status != "completed":
-            return Response(
-                {"error": "Ratings can only be given for completed handshakes."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Validate user is part of handshake
-        if request.user not in [handshake.provider, handshake.seeker]:
-            return Response(
-                {"error": "You are not part of this handshake."},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        # Validate rated_user is the other participant
-        other_participant = handshake.seeker if request.user == handshake.provider else handshake.provider
-        if rated_user != other_participant:
-            return Response(
-                {"error": "You can only rate the other participant in the handshake."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Check if rating already exists
-        if Rating.objects.filter(handshake=handshake, rater=request.user).exists():
-            return Response(
-                {"error": "You have already rated this handshake."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
         serializer.save(rater=request.user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -1094,8 +1422,125 @@ def badges_list(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    serializer = BadgeSerializer(badges, many=True)
+        serializer = BadgeSerializer(badges, many=True)
+        return Response(serializer.data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def rating_create_for_handshake(request, handshake_id):
+    """
+    Create a rating for a completed handshake.
+    POST /api/ratings/<handshake_id>/
+    Body: { "score": 1-10, "tags": ["tag1", "tag2"], "comment": "optional" }
+    """
+    try:
+        handshake = Handshake.objects.get(pk=handshake_id)
+    except Handshake.DoesNotExist:
+        return Response(
+            {"error": "Handshake not found."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Validate handshake is completed
+    if handshake.status != "completed":
+        return Response(
+            {"error": "Ratings can only be given for completed handshakes."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Validate user is part of handshake
+    if request.user not in [handshake.provider, handshake.seeker]:
+        return Response(
+            {"error": "You are not part of this handshake."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Check if rating already exists
+    if Rating.objects.filter(handshake=handshake, rater=request.user).exists():
+        return Response(
+            {"error": "You have already rated this handshake."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Determine ratee (the other participant)
+    ratee = handshake.seeker if request.user == handshake.provider else handshake.provider
+    
+    # Prepare data for serializer
+    data = request.data.copy()
+    data["handshake"] = handshake_id
+    data["ratee"] = ratee.id
+    
+    serializer = RatingSerializer(data=data, context={"request": request})
+    if serializer.is_valid():
+        serializer.save(rater=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def ratings_by_user(request, user_id):
+    """
+    Get all ratings received by a user.
+    GET /api/ratings/user/<user_id>/
+    """
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response(
+            {"error": "User not found."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    ratings = Rating.objects.filter(ratee=user).order_by("-created_at")
+    serializer = RatingSerializer(ratings, many=True)
     return Response(serializer.data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def ratings_by_handshake(request, handshake_id):
+    """
+    Get rating status for a handshake.
+    GET /api/ratings/handshake/<handshake_id>/
+    Returns information about ratings submitted by both participants.
+    """
+    try:
+        handshake = Handshake.objects.get(pk=handshake_id)
+    except Handshake.DoesNotExist:
+        return Response(
+            {"error": "Handshake not found."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Validate user is part of handshake
+    if request.user not in [handshake.provider, handshake.seeker]:
+        return Response(
+            {"error": "You are not part of this handshake."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Get ratings for this handshake
+    ratings = Rating.objects.filter(handshake=handshake)
+    
+    # Determine if current user has rated
+    user_rating = ratings.filter(rater=request.user).first()
+    has_rated = user_rating is not None
+    
+    # Determine if partner has rated
+    partner = handshake.seeker if request.user == handshake.provider else handshake.provider
+    partner_rating = ratings.filter(rater=partner).first()
+    partner_has_rated = partner_rating is not None
+    
+    return Response({
+        "handshake_id": handshake_id,
+        "handshake_status": handshake.status,
+        "has_rated": has_rated,
+        "partner_has_rated": partner_has_rated,
+        "user_rating": RatingSerializer(user_rating).data if user_rating else None,
+        "partner_rating": RatingSerializer(partner_rating).data if partner_rating else None,
+    })
 
 
 @api_view(["GET"])
@@ -1138,3 +1583,198 @@ def tags_list(request):
         unique_tags = [tag for tag in unique_tags if query in tag.lower()]
     
     return Response({"tags": unique_tags}, status=status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# FORUM
+# ---------------------------------------------------------------------------
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def forum_topics_list_create(request):
+    """
+    List all forum topics or create a new topic.
+    GET /api/forum/topics/ - List all topics
+    POST /api/forum/topics/ - Create a new topic
+    """
+    if request.method == "GET":
+        topics = ForumTopic.objects.all().order_by("-created_at")
+        serializer = ForumTopicSerializer(topics, many=True, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    # POST - Create new topic
+    serializer = ForumTopicSerializer(data=request.data, context={"request": request})
+    if serializer.is_valid():
+        serializer.save(author=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def forum_topic_detail(request, topic_id):
+    """
+    Get topic detail with all replies.
+    GET /api/forum/topics/<id>/
+    """
+    try:
+        topic = ForumTopic.objects.get(pk=topic_id)
+    except ForumTopic.DoesNotExist:
+        return Response({"error": "Topic not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+    serializer = ForumTopicSerializer(topic, context={"request": request})
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def forum_topic_reply(request, topic_id):
+    """
+    Add a reply to a topic.
+    POST /api/forum/topics/<id>/reply/
+    """
+    try:
+        topic = ForumTopic.objects.get(pk=topic_id)
+    except ForumTopic.DoesNotExist:
+        return Response({"error": "Topic not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+    serializer = ForumReplySerializer(data=request.data, context={"request": request})
+    if serializer.is_valid():
+        serializer.save(topic=topic, author=request.user)
+        # Return updated topic with all replies
+        topic_serializer = ForumTopicSerializer(topic, context={"request": request})
+        return Response(topic_serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def forum_topic_delete(request, topic_id):
+    """
+    Delete a forum topic (admin only).
+    DELETE /api/forum/topics/<id>/delete/
+    """
+    try:
+        topic = ForumTopic.objects.get(pk=topic_id)
+    except ForumTopic.DoesNotExist:
+        return Response({"error": "Topic not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if user is admin
+    if not (request.user.is_staff or request.user.is_superuser):
+        return Response(
+            {"error": "Only administrators can delete topics."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    topic.delete()
+    return Response({"message": "Topic deleted successfully."}, status=status.HTTP_200_OK)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def forum_reply_delete(request, reply_id):
+    """
+    Delete a forum reply (admin only).
+    DELETE /api/forum/replies/<id>/delete/
+    """
+    try:
+        reply = ForumReply.objects.get(pk=reply_id)
+    except ForumReply.DoesNotExist:
+        return Response({"error": "Reply not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if user is admin
+    if not (request.user.is_staff or request.user.is_superuser):
+        return Response(
+            {"error": "Only administrators can delete replies."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    reply.delete()
+    return Response({"message": "Reply deleted successfully."}, status=status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# INBOX
+# ---------------------------------------------------------------------------
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def inbox_pending_handshakes(request):
+    """
+    Get pending handshakes for the current user.
+    GET /api/inbox/pending-handshakes/
+    Returns handshakes with status "proposed" where user is the provider.
+    """
+    user = request.user
+    pending_handshakes = Handshake.objects.filter(
+        provider=user,
+        status="proposed"
+    ).order_by("-created_at")
+    
+    serializer = HandshakeSerializer(pending_handshakes, many=True, context={"request": request})
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def inbox_unread_messages(request):
+    """
+    Get unread messages for the current user.
+    GET /api/inbox/unread-messages/
+    Returns messages in handshakes where user is a participant but not the sender, and is_read=False.
+    """
+    user = request.user
+    # Get all handshakes where user is participant
+    user_handshakes = Handshake.objects.filter(
+        models.Q(provider=user) | models.Q(seeker=user)
+    )
+    
+    # Get unread messages where user is not the sender
+    unread_messages = Message.objects.filter(
+        handshake__in=user_handshakes,
+        is_read=False
+    ).exclude(sender=user).order_by("-created_at")
+    
+    serializer = MessageSerializer(unread_messages, many=True, context={"request": request})
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def inbox_conversations(request):
+    """
+    Get all conversations (handshakes with messages) for the current user.
+    GET /api/inbox/conversations/
+    Returns all handshakes that have messages, grouped by handshake.
+    """
+    user = request.user
+    # Get all handshakes where user is participant
+    user_handshakes = Handshake.objects.filter(
+        models.Q(provider=user) | models.Q(seeker=user)
+    ).filter(status__in=["accepted", "in_progress", "completed"])
+    
+    # Get handshakes that have messages
+    conversations = []
+    for handshake in user_handshakes:
+        messages = Message.objects.filter(handshake=handshake).order_by("-created_at")
+        if messages.exists():
+            # Get the latest message
+            latest_message = messages.first()
+            unread_count = messages.filter(is_read=False).exclude(sender=user).count()
+            
+            # Get the other participant
+            other_user = handshake.seeker if handshake.provider == user else handshake.provider
+            
+            conversations.append({
+                "handshake": HandshakeSerializer(handshake, context={"request": request}).data,
+                "other_user_id": other_user.id,
+                "other_username": other_user.username,
+                "latest_message": MessageSerializer(latest_message, context={"request": request}).data,
+                "unread_count": unread_count,
+                "total_messages": messages.count(),
+            })
+    
+    # Sort by latest message time (newest first)
+    conversations.sort(key=lambda x: x["latest_message"]["created_at"], reverse=True)
+    
+    return Response(conversations, status=status.HTTP_200_OK)

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.core.exceptions import ValidationError
-from .models import UserProfile, Offer, Request, Handshake, Transaction, Question, Message, Rating, Badge
+from .models import UserProfile, Offer, Request, Handshake, Transaction, Question, Message, Rating, Badge, ForumTopic, ForumReply
 from .location_utils import get_fuzzy_coordinates
 
 # ---------------------------------------------------------------------------
@@ -13,6 +13,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
     average_rating = serializers.ReadOnlyField()
     total_ratings = serializers.ReadOnlyField()
     profile_picture_url = serializers.SerializerMethodField()
+    email_verified = serializers.SerializerMethodField()
+    is_admin = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
@@ -20,7 +22,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "id", "username", "email", "bio", "skills", "interests", 
             "profile_picture", "profile_picture_url", "timebank_balance", 
             "location", "province", "district", "is_visible", 
-            "average_rating", "total_ratings", "created_at"
+            "average_rating", "total_ratings", "created_at", "email_verified", "is_admin"
         ]
         read_only_fields = ["created_at", "average_rating", "total_ratings"]
 
@@ -40,6 +42,115 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.profile_picture.url)
             return obj.profile_picture.url
         return None
+    
+    def get_email_verified(self, obj):
+        """Show email verification status only to admins"""
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            is_admin = request.user.is_staff or request.user.is_superuser
+            if is_admin:
+                return getattr(obj, 'email_verified', False)
+        return None  # Don't show to non-admins
+    
+    def get_is_admin(self, obj):
+        """Show if the profile owner is an admin (only visible to other admins)"""
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            is_viewer_admin = request.user.is_staff or request.user.is_superuser
+            if is_viewer_admin:
+                return obj.user.is_staff or obj.user.is_superuser
+        return None  # Don't show to non-admins
+
+
+class PublicProfileSerializer(serializers.ModelSerializer):
+    """Serializer for public profile viewing - excludes private information"""
+    username = serializers.CharField(source="user.username", read_only=True)
+    location = serializers.SerializerMethodField()
+    average_rating = serializers.ReadOnlyField()
+    total_ratings = serializers.ReadOnlyField()
+    profile_picture_url = serializers.SerializerMethodField()
+    badges = serializers.SerializerMethodField()
+    ratings = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfile
+        fields = [
+            "id",
+            "username",
+            "bio",
+            "skills",
+            "interests",
+            "profile_picture_url",
+            "location",
+            "province",
+            "district",
+            "average_rating",
+            "total_ratings",
+            "badges",
+            "ratings",
+            "top_tags",
+        ]
+        read_only_fields = ["average_rating", "total_ratings", "top_tags"]
+
+    def get_location(self, obj):
+        if obj.province and obj.district:
+            return f"{obj.district}, {obj.province}"
+        elif obj.province:
+            return obj.province
+        elif obj.district:
+            return obj.district
+        return None
+    
+    def get_profile_picture_url(self, obj):
+        if obj.profile_picture:
+            request = self.context.get("request")
+            if request:
+                return request.build_absolute_uri(obj.profile_picture.url)
+            return obj.profile_picture.url
+        return None
+    
+    def get_badges(self, obj):
+        """Get all badges for the user"""
+        badges = obj.user.badges.all().order_by("-earned_at")
+        return [
+            {
+                "id": badge.id,
+                "badge_type": badge.badge_type,
+                "badge_type_display": badge.get_badge_type_display(),
+                "description": badge.description,
+                "earned_at": badge.earned_at,
+            }
+            for badge in badges
+        ]
+    
+    def get_ratings(self, obj):
+        """Get all ratings and feedback for the user"""
+        from .models import Rating
+        ratings = Rating.objects.filter(ratee=obj.user).order_by("-created_at")
+        return [
+            {
+                "id": rating.id,
+                "rater": rating.rater.id,
+                "rater_username": rating.rater.username,
+                "score": rating.score,
+                "tags": rating.tags,
+                "comment": rating.comment,
+                "created_at": rating.created_at,
+            }
+            for rating in ratings
+        ]
+    
+    def get_top_tags(self, obj):
+        """Get top 3 most common tags from all ratings"""
+        from .models import Rating
+        from collections import Counter
+        ratings = Rating.objects.filter(ratee=obj.user)
+        all_tags = []
+        for rating in ratings:
+            if rating.tags:
+                all_tags.extend(rating.tags)
+        top_tags = [tag for tag, count in Counter(all_tags).most_common(3)]
+        return top_tags
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +320,8 @@ class RequestSerializer(serializers.ModelSerializer):
 class HandshakeSerializer(serializers.ModelSerializer):
     provider_username = serializers.CharField(source="provider.username", read_only=True)
     seeker_username = serializers.CharField(source="seeker.username", read_only=True)
+    offer_title = serializers.SerializerMethodField()
+    request_title = serializers.SerializerMethodField()
 
     class Meta:
         model = Handshake
@@ -216,6 +329,8 @@ class HandshakeSerializer(serializers.ModelSerializer):
             "id",
             "offer",
             "request",
+            "offer_title",
+            "request_title",
             "provider",
             "provider_username",
             "seeker",
@@ -233,7 +348,15 @@ class HandshakeSerializer(serializers.ModelSerializer):
             "provider_confirmed",
             "seeker_confirmed",
             "created_at",
+            "offer_title",
+            "request_title",
         ]
+
+    def get_offer_title(self, obj):
+        return obj.offer.title if obj.offer else None
+
+    def get_request_title(self, obj):
+        return obj.request.title if obj.request else None
 
     def validate(self, data):
         offer = data.get("offer")
@@ -394,7 +517,7 @@ class MessageSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------------
 class RatingSerializer(serializers.ModelSerializer):
     rater_username = serializers.CharField(source="rater.username", read_only=True)
-    rated_user_username = serializers.CharField(source="rated_user.username", read_only=True)
+    ratee_username = serializers.CharField(source="ratee.username", read_only=True)
 
     class Meta:
         model = Rating
@@ -403,18 +526,52 @@ class RatingSerializer(serializers.ModelSerializer):
             "handshake",
             "rater",
             "rater_username",
-            "rated_user",
-            "rated_user_username",
-            "rating",
+            "ratee",
+            "ratee_username",
+            "score",
+            "tags",
             "comment",
             "created_at",
         ]
-        read_only_fields = ["rater", "created_at"]
+        read_only_fields = ["rater", "ratee", "created_at"]
+
+    def validate_score(self, value):
+        if value < 1 or value > 10:
+            raise serializers.ValidationError("Score must be between 1 and 10.")
+        return value
+
+    def validate_tags(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Tags must be a list.")
+        if len(value) > 3:
+            raise serializers.ValidationError("You can select at most 3 tags.")
+        if len(value) < 1:
+            raise serializers.ValidationError("You must select at least 1 tag.")
+        
+        # Validate tags are from predefined list
+        valid_tags = [tag[0] for tag in Rating.TAG_CHOICES]
+        for tag in value:
+            if tag not in valid_tags:
+                raise serializers.ValidationError(f"Invalid tag: {tag}. Must be from predefined list.")
+        
+        return value
 
     def validate(self, data):
         handshake = data.get("handshake")
         if handshake and handshake.status != "completed":
             raise serializers.ValidationError("Ratings can only be given for completed handshakes.")
+        
+        # Validate handshake participants
+        rater = self.context.get("request").user if self.context.get("request") else None
+        if rater and handshake:
+            if rater not in [handshake.provider, handshake.seeker]:
+                raise serializers.ValidationError("You are not part of this handshake.")
+            # Set ratee to the other participant
+            if rater == handshake.provider:
+                data["ratee"] = handshake.seeker
+            else:
+                data["ratee"] = handshake.provider
+        
         return data
 
 
@@ -432,3 +589,47 @@ class BadgeSerializer(serializers.ModelSerializer):
             "earned_at",
         ]
         read_only_fields = ["earned_at"]
+
+
+# ---------------------------------------------------------------------------
+# FORUM
+# ---------------------------------------------------------------------------
+class ForumReplySerializer(serializers.ModelSerializer):
+    author_username = serializers.CharField(source="author.username", read_only=True)
+
+    class Meta:
+        model = ForumReply
+        fields = [
+            "id",
+            "topic",
+            "body",
+            "author",
+            "author_username",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["author", "created_at", "updated_at"]
+
+
+class ForumTopicSerializer(serializers.ModelSerializer):
+    author_username = serializers.CharField(source="author.username", read_only=True)
+    reply_count = serializers.SerializerMethodField()
+    replies = ForumReplySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ForumTopic
+        fields = [
+            "id",
+            "title",
+            "body",
+            "author",
+            "author_username",
+            "created_at",
+            "updated_at",
+            "reply_count",
+            "replies",
+        ]
+        read_only_fields = ["author", "created_at", "updated_at"]
+
+    def get_reply_count(self, obj):
+        return obj.replies.count()

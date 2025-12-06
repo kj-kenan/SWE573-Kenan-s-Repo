@@ -24,6 +24,12 @@ function ProfileList() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isViewerAdmin, setIsViewerAdmin] = useState(false);
+  
+  // Add missing state declarations
+  const [timebankBalance, setTimebankBalance] = useState(0);
+  const [transactions, setTransactions] = useState([]);
+  const [loadingTimebank, setLoadingTimebank] = useState(true);
 
   const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL ||
@@ -39,8 +45,23 @@ function ProfileList() {
       } catch (e) {
         console.error("Error decoding token:", e);
       }
+      
+      // Check if current user is an admin
+      fetch(`${API_BASE_URL}/api/profiles/me/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => res.json())
+        .then((ownProfile) => {
+          // Check if the viewer is an admin (is_admin field from their own profile)
+          setIsViewerAdmin(ownProfile.is_admin === true);
+        })
+        .catch((err) => {
+          console.error("Error checking admin status:", err);
+          setIsViewerAdmin(false);
+        });
     } else {
       setIsAuthenticated(false);
+      setIsViewerAdmin(false);
     }
 
     loadProfile();
@@ -120,6 +141,26 @@ function ProfileList() {
             ? requestsData.filter((r) => r.username === username)
             : [],
         });
+      }
+
+      // Load timebank data (only for own profile)
+      if (viewingOwnProfile && token) {
+        try {
+          const timebankRes = await fetch(`${API_BASE_URL}/api/timebank/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (timebankRes.ok) {
+            const timebankData = await timebankRes.json();
+            setTimebankBalance(timebankData.balance || 0);
+            setTransactions(Array.isArray(timebankData.transactions) ? timebankData.transactions : []);
+          }
+        } catch (err) {
+          console.error("Error loading timebank:", err);
+        } finally {
+          setLoadingTimebank(false);
+        }
+      } else {
+        setLoadingTimebank(false);
       }
     } catch (err) {
       setError(err.message || "Failed to load profile");
@@ -304,8 +345,21 @@ function ProfileList() {
               )}
             </div>
             <div className="flex-grow">
-              <h1 className="text-4xl font-bold text-amber-700 mb-2">{profile.username}</h1>
+              <div className="flex items-center gap-2 mb-2">
+                <h1 className="text-4xl font-bold text-amber-700">{profile.username}</h1>
+                {profile.is_admin && (
+                  <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded">
+                    Admin
+                  </span>
+                )}
+              </div>
               <p className="text-gray-600 mb-2">{profile.email}</p>
+              {/* Admin-only: Email verification status */}
+              {isViewerAdmin && profile.email_verified !== null && profile.email_verified !== undefined && (
+                <p className={`text-sm mb-2 ${profile.email_verified ? 'text-green-600' : 'text-red-600'}`}>
+                  {profile.email_verified ? '✓ Email Verified' : '✗ Email Not Verified'}
+                </p>
+              )}
               {profile.location && (
                 <p className="text-gray-500 text-sm mb-4">📍 {profile.location}</p>
               )}
@@ -491,6 +545,105 @@ function ProfileList() {
                       </span>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Your Beellars - Only show for own profile */}
+            {isOwnProfile && (
+              <div>
+                <h2 className="text-2xl font-semibold text-amber-700 mb-4">Your Beellars</h2>
+                <div className="bg-white rounded-2xl shadow-lg border border-amber-200 px-8 py-6 text-center">
+                  {loadingTimebank ? (
+                    <p className="text-gray-600">Loading balance...</p>
+                  ) : (
+                    <p className="text-5xl font-bold text-gray-800">{timebankBalance}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Transaction History - Only show for own profile */}
+            {isOwnProfile && (
+              <div>
+                <h2 className="text-2xl font-semibold text-amber-700 mb-4">Transaction History</h2>
+                <div className="bg-white rounded-2xl shadow-lg border border-amber-200 p-6">
+                  {loadingTimebank ? (
+                    <p className="text-center text-gray-500 py-8">Loading transactions...</p>
+                  ) : transactions.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">
+                      No transactions yet. Complete handshakes to see your transaction history.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {transactions.map((transaction) => {
+                        const isEarned = transaction.transaction_type === "earned";
+                        const isSpent = transaction.transaction_type === "spent";
+                        
+                        return (
+                          <div
+                            key={transaction.id}
+                            className={`border-l-4 p-4 rounded-lg ${
+                              isEarned
+                                ? "bg-green-50 border-green-500"
+                                : isSpent
+                                ? "bg-red-50 border-red-500"
+                                : "bg-gray-50 border-gray-300"
+                            }`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span
+                                    className={`px-2 py-1 rounded text-xs font-semibold ${
+                                      isEarned
+                                        ? "bg-green-200 text-green-800"
+                                        : isSpent
+                                        ? "bg-red-200 text-red-800"
+                                        : "bg-gray-200 text-gray-800"
+                                    }`}
+                                  >
+                                    {isEarned ? "💰 Earned" : isSpent ? "💸 Spent" : "📊 Transaction"}
+                                  </span>
+                                  <span className="text-sm text-gray-600">
+                                    {new Date(transaction.created_at).toLocaleDateString()} at{" "}
+                                    {new Date(transaction.created_at).toLocaleTimeString()}
+                                  </span>
+                                </div>
+                                {transaction.related_post_title && (
+                                  <p className="text-sm text-gray-700 mb-1">
+                                    <span className="font-semibold">Related post:</span> {transaction.related_post_title}
+                                  </p>
+                                )}
+                                <p className="text-xs text-gray-500">
+                                  {isEarned
+                                    ? `Received from ${transaction.sender_username}`
+                                    : isSpent
+                                    ? `Paid to ${transaction.receiver_username}`
+                                    : `${transaction.sender_username} → ${transaction.receiver_username}`}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p
+                                  className={`text-2xl font-bold ${
+                                    isEarned
+                                      ? "text-green-600"
+                                      : isSpent
+                                      ? "text-red-600"
+                                      : "text-gray-600"
+                                  }`}
+                                >
+                                  {isEarned ? "+" : isSpent ? "-" : ""}
+                                  {transaction.amount}
+                                </p>
+                                <p className="text-xs text-gray-500">Beellars</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

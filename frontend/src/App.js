@@ -20,22 +20,25 @@ import CreateService from "./components/CreateService";
 import thehiveicon from "./assets/thehive.png";
 import homeIcon from "./assets/home.svg";
 import offersIcon from "./assets/offers.svg";
-import timebankIcon from "./assets/timebank.svg";
 import profileIcon from "./assets/profile.svg";
-import settingsIcon from "./assets/settings.svg";
+import forumIcon from "./assets/forum.svg";
+import inboxIcon from "./assets/inbox.svg";
 import logoutIcon from "./assets/logout.svg"; 
 //import MyOffers from "./components/MyOffers";
-import OffersList from "./components/OfferList";
-import TimeBank from "./components/TimeBank";
+import CommunityServices from "./components/CommunityServices";
 import OfferDetail from "./components/OfferDetail";
 import RequestDetail from "./components/RequestDetail";
 import EditOffer from "./components/EditOffer";
 import EditRequest from "./components/EditRequest";
 import HandshakesList from "./components/HandshakesList";
+import Forum from "./components/Forum";
+import PublicProfile from "./components/PublicProfile";
+import Inbox from "./components/Inbox";
+import ForgotPassword from "./components/ForgotPassword";
+import ResetPassword from "./components/ResetPassword";
 
 function Navbar({ onLogout }) {
   const location = useLocation();
-  const [showOffersMenu, setShowOffersMenu] = React.useState(false);
   const isLoggedIn = Boolean(localStorage.getItem("access"));
 
   if (
@@ -44,7 +47,9 @@ function Navbar({ onLogout }) {
     location.pathname === "/register" ||
     location.pathname.startsWith("/activate/") ||
     location.pathname === "/check-email" ||
-    location.pathname === "/resend-activation"
+    location.pathname === "/resend-activation" ||
+    location.pathname === "/forgot-password" ||
+    location.pathname.startsWith("/reset-password/")
   )
     return null;
 
@@ -78,74 +83,20 @@ function Navbar({ onLogout }) {
           <span>Home</span>
         </Link>
 
-        {/* Offers & Requests Dropdown */}
-        <div className="relative">
-          <button
-            onClick={() => setShowOffersMenu(!showOffersMenu)}
-            className="hover:text-amber-800 flex items-center gap-1 transition-colors"
-            onBlur={() => setTimeout(() => setShowOffersMenu(false), 200)}
-          >
-            <img
-              src={offersIcon}
-              alt="Offers"
-              className="w-6 h-6"
-              style={{ filter: "invert(12%) sepia(15%) saturate(900%) hue-rotate(10deg) brightness(60%) contrast(90%)" }}
-            />
-            <span>Offers & Requests</span>
-            <span className="text-xs ml-1">▼</span>
-          </button>
-          {/* Dropdown Menu */}
-          {showOffersMenu && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 border border-amber-200">
-              <div className="py-2">
-                <Link
-                  to="/offers/all"
-                  onClick={() => setShowOffersMenu(false)}
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700"
-                >
-                  All Offers
-                </Link>
-                {isLoggedIn && (
-                  <Link
-                    to="/offers/my"
-                    onClick={() => setShowOffersMenu(false)}
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700"
-                  >
-                    My Offers
-                  </Link>
-                )}
-                <Link
-                  to="/requests/all"
-                  onClick={() => setShowOffersMenu(false)}
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700 border-t border-amber-100"
-                >
-                  All Requests
-                </Link>
-                {isLoggedIn && (
-                  <Link
-                    to="/requests/my"
-                    onClick={() => setShowOffersMenu(false)}
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700"
-                  >
-                    My Requests
-                  </Link>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
+        {/* Offers & Requests */}
         <Link
-          to="/timebank"
-          className="hover:text-amber-800 flex items-center gap-1 transition-colors"
+          to="/offers"
+          className={`hover:text-amber-800 flex items-center gap-1 transition-colors ${
+            location.pathname.startsWith("/offers") || location.pathname.startsWith("/requests") ? "font-bold" : ""
+          }`}
         >
           <img
-            src={timebankIcon}
-            alt="TimeBank"
+            src={offersIcon}
+            alt="Offers & Requests"
             className="w-6 h-6"
             style={{ filter: "invert(12%) sepia(15%) saturate(900%) hue-rotate(10deg) brightness(60%) contrast(90%)" }}
           />
-          <span>TimeBank</span>
+          <span>Offers & Requests</span>
         </Link>
 
         <Link
@@ -162,16 +113,29 @@ function Navbar({ onLogout }) {
         </Link>
 
         <Link
-          to="/settings"
+          to="/inbox"
           className="hover:text-amber-800 flex items-center gap-1 transition-colors"
         >
           <img
-            src={settingsIcon}
-            alt="Settings"
+            src={inboxIcon}
+            alt="Inbox"
             className="w-6 h-6"
             style={{ filter: "invert(12%) sepia(15%) saturate(900%) hue-rotate(10deg) brightness(60%) contrast(90%)" }}
           />
-          <span>Settings</span>
+          <span>Inbox</span>
+        </Link>
+
+        <Link
+          to="/forum"
+          className="hover:text-amber-800 flex items-center gap-1 transition-colors"
+        >
+          <img
+            src={forumIcon}
+            alt="Forum"
+            className="w-6 h-6"
+            style={{ filter: "invert(12%) sepia(15%) saturate(900%) hue-rotate(10deg) brightness(60%) contrast(90%)" }}
+          />
+          <span>Forum</span>
         </Link>
 
         {/* Logout */}
@@ -214,21 +178,25 @@ function App() {
           <Route path="/check-email" element={<CheckEmail />} />
           <Route path="/activate/:token" element={<Activate />} />
           <Route path="/resend-activation" element={<ResendActivation />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/profile" element={<ProfileList />} />
           <Route path="/profile/:userId" element={<ProfileList />} />
           <Route path="/create" element={<CreateService />} />
-          <Route path="/offers" element={<OffersList defaultTab="offers" defaultSubTab="all" />} />
-          <Route path="/offers/all" element={<OffersList defaultTab="offers" defaultSubTab="all" />} />
-          <Route path="/offers/my" element={<OffersList defaultTab="offers" defaultSubTab="my" />} />
-          <Route path="/requests/all" element={<OffersList defaultTab="requests" defaultSubTab="all" />} />
-          <Route path="/requests/my" element={<OffersList defaultTab="requests" defaultSubTab="my" />} />
+          <Route path="/offers" element={<CommunityServices />} />
+          <Route path="/offers/all" element={<CommunityServices />} />
+          <Route path="/offers/my" element={<CommunityServices />} />
+          <Route path="/requests/all" element={<CommunityServices />} />
+          <Route path="/requests/my" element={<CommunityServices />} />
           <Route path="/offers/:id" element={<OfferDetail />} />
           <Route path="/offers/:id/edit" element={<EditOffer />} />
           <Route path="/requests/:id" element={<RequestDetail />} />
           <Route path="/requests/:id/edit" element={<EditRequest />} />
           <Route path="/handshakes" element={<HandshakesList />} />
-          <Route path="/settings" element={<h1 className="text-center mt-20 text-3xl">Settings Page</h1>}/>
-          <Route path="/timebank" element={<TimeBank/>}/>
+          <Route path="/forum" element={<Forum />} />
+          <Route path="/forum/:topicId" element={<Forum />} />
+          <Route path="/profile/:id" element={<PublicProfile />} />
+          <Route path="/inbox" element={<Inbox />} />
         </Routes>
       </main>
 

@@ -25,29 +25,19 @@ function TimeBank() {
       Authorization: `Bearer ${token}`,
     };
 
-    // Fetch balance and transactions in parallel
-    Promise.all([
-      fetch(`${API_BASE_URL}/api/timebank/balance/`, { headers }),
-      fetch(`${API_BASE_URL}/api/transactions/`, { headers }),
-    ])
-      .then(async ([balanceRes, transactionsRes]) => {
-        if (!balanceRes.ok) {
-          if (balanceRes.status === 401) {
+    // Fetch unified timebank data (balance + transactions)
+    fetch(`${API_BASE_URL}/api/timebank/`, { headers })
+      .then(async (res) => {
+        if (!res.ok) {
+          if (res.status === 401) {
             throw new Error("Authentication failed. Please log in again.");
           }
-          throw new Error("Failed to fetch balance.");
+          throw new Error("Failed to fetch timebank data.");
         }
 
-        const balanceData = await balanceRes.json();
-        setBalance(balanceData.balance || 0);
-
-        if (transactionsRes.ok) {
-          const transactionsData = await transactionsRes.json();
-          setTransactions(Array.isArray(transactionsData) ? transactionsData : []);
-        } else {
-          console.warn("Failed to fetch transactions:", transactionsRes.status);
-          setTransactions([]);
-        }
+        const data = await res.json();
+        setBalance(data.balance || 0);
+        setTransactions(Array.isArray(data.transactions) ? data.transactions : []);
       })
       .catch((err) => {
         setError(err.message || "Server connection error.");

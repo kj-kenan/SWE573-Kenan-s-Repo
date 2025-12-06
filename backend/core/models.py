@@ -210,7 +210,19 @@ class Message(models.Model):
 
 class Rating(models.Model):
     """Ratings given after a completed handshake"""
-    RATING_CHOICES = [(i, i) for i in range(1, 6)]  # 1-5 stars
+    # Predefined tags
+    TAG_CHOICES = [
+        ("On Time", "On Time"),
+        ("Good Communication", "Good Communication"),
+        ("Friendly", "Friendly"),
+        ("Reliable", "Reliable"),
+        ("Professional", "Professional"),
+        ("High Quality Work", "High Quality Work"),
+        ("Efficient", "Efficient"),
+        ("Organized", "Organized"),
+        ("Respectful", "Respectful"),
+        ("Above and Beyond", "Above and Beyond"),
+    ]
     
     handshake = models.ForeignKey(
         Handshake, on_delete=models.CASCADE, related_name="ratings"
@@ -218,10 +230,11 @@ class Rating(models.Model):
     rater = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="ratings_given"
     )
-    rated_user = models.ForeignKey(
+    ratee = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="ratings_received"
     )
-    rating = models.IntegerField(choices=RATING_CHOICES)
+    score = models.IntegerField(choices=[(i, i) for i in range(1, 11)])  # 1-10 score
+    tags = models.JSONField(default=list, help_text="Array of tag strings (max 3)")
     comment = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -236,14 +249,22 @@ class Rating(models.Model):
         # Ensure rater is either provider or seeker in the handshake
         if self.rater not in [self.handshake.provider, self.handshake.seeker]:
             raise ValidationError("Only participants in the handshake can rate.")
-        # Ensure rated_user is the other participant
-        if self.rated_user not in [self.handshake.provider, self.handshake.seeker]:
+        # Ensure ratee is the other participant
+        if self.ratee not in [self.handshake.provider, self.handshake.seeker]:
             raise ValidationError("You can only rate the other participant in the handshake.")
-        if self.rater == self.rated_user:
+        if self.ratee == self.rater:
             raise ValidationError("You cannot rate yourself.")
+        # Validate tags
+        if self.tags:
+            valid_tags = [tag[0] for tag in self.TAG_CHOICES]
+            if len(self.tags) > 3:
+                raise ValidationError("You can select at most 3 tags.")
+            for tag in self.tags:
+                if tag not in valid_tags:
+                    raise ValidationError(f"Invalid tag: {tag}. Must be from predefined list.")
 
     def __str__(self):
-        return f"Rating {self.rating}/5 from {self.rater.username} to {self.rated_user.username}"
+        return f"Rating {self.score}/10 from {self.rater.username} to {self.ratee.username}"
 
 
 class Badge(models.Model):
@@ -270,3 +291,39 @@ class Badge(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.get_badge_type_display()}"
+
+
+class ForumTopic(models.Model):
+    """Forum topics for community discussions"""
+    title = models.CharField(max_length=200)
+    body = models.TextField()
+    author = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="forum_topics"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.title} by {self.author.username}"
+
+
+class ForumReply(models.Model):
+    """Replies to forum topics"""
+    topic = models.ForeignKey(
+        ForumTopic, on_delete=models.CASCADE, related_name="replies"
+    )
+    body = models.TextField()
+    author = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="forum_replies"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at"]  # Chronological order
+
+    def __str__(self):
+        return f"Reply to '{self.topic.title}' by {self.author.username}"

@@ -1,6 +1,6 @@
 
 from django.contrib import admin
-from .models import UserProfile, Offer, Request, Handshake, Transaction, Question, Message, Rating, Badge, Rating, Badge
+from .models import UserProfile, Offer, Request, Handshake, Transaction, Question, Message, Rating, Badge, ForumTopic, ForumReply
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
@@ -35,10 +35,19 @@ class HandshakeAdmin(admin.ModelAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ("id", "sender", "receiver", "amount", "created_at")
-    search_fields = ("sender__username", "receiver__username")
-    list_filter = ("created_at",)
+    list_display = ("id", "sender", "receiver", "amount", "handshake", "related_post", "created_at")
+    search_fields = ("sender__username", "receiver__username", "handshake__offer__title", "handshake__request__title")
+    list_filter = ("created_at", "amount")
     readonly_fields = ("created_at",)
+    
+    def related_post(self, obj):
+        """Display the related post title"""
+        if obj.handshake.offer:
+            return f"Offer: {obj.handshake.offer.title}"
+        elif obj.handshake.request:
+            return f"Request: {obj.handshake.request.title}"
+        return "N/A"
+    related_post.short_description = "Related Post"
 
 
 @admin.register(Question)
@@ -76,3 +85,23 @@ class BadgeAdmin(admin.ModelAdmin):
     search_fields = ("user__username", "badge_type")
     list_filter = ("badge_type", "earned_at")
     readonly_fields = ("earned_at",)
+
+
+@admin.register(ForumTopic)
+class ForumTopicAdmin(admin.ModelAdmin):
+    list_display = ("id", "title", "author", "reply_count", "created_at")
+    search_fields = ("title", "body", "author__username")
+    list_filter = ("created_at",)
+    readonly_fields = ("created_at", "updated_at")
+    
+    def reply_count(self, obj):
+        return obj.replies.count()
+    reply_count.short_description = "Replies"
+
+
+@admin.register(ForumReply)
+class ForumReplyAdmin(admin.ModelAdmin):
+    list_display = ("id", "topic", "author", "created_at")
+    search_fields = ("body", "author__username", "topic__title")
+    list_filter = ("created_at",)
+    readonly_fields = ("created_at", "updated_at")

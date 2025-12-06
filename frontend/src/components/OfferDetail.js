@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import RatingModal from "./RatingModal";
 
 function OfferDetail() {
   const { id } = useParams();
@@ -15,6 +16,9 @@ function OfferDetail() {
   const [newMessage, setNewMessage] = useState("");
   const [showChat, setShowChat] = useState(false);
   const [answerInputs, setAnswerInputs] = useState({}); // Store answer inputs by question ID
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [partnerName, setPartnerName] = useState("");
+  const [ratingStatus, setRatingStatus] = useState(null); // { has_rated, partner_has_rated }
 
   const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL ||
@@ -78,6 +82,29 @@ function OfferDetail() {
       .then((data) => {
         setOffer(data);
         setLoading(false);
+        
+        // Load rating status if handshake is completed
+        if (data.active_handshake && data.active_handshake.status === "completed") {
+          const token = localStorage.getItem("access");
+          if (token) {
+            fetch(`${API_BASE_URL}/api/ratings/handshake/${data.active_handshake.id}/`, {
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            })
+              .then(res => res.json())
+              .then(statusData => {
+                if (statusData.has_rated !== undefined) {
+                  setRatingStatus({
+                    has_rated: statusData.has_rated,
+                    partner_has_rated: statusData.partner_has_rated,
+                  });
+                }
+              })
+              .catch(err => console.error("Error fetching rating status:", err));
+          }
+        }
         
         // Load questions for this offer
         fetch(`${API_BASE_URL}/api/questions/?offer=${id}`)
@@ -465,6 +492,49 @@ function OfferDetail() {
     }
   };
 
+  const handleConfirmCompletion = async (handshakeId, isProvider) => {
+    const token = localStorage.getItem("access");
+    if (!token) {
+      setMessage("Please log in.");
+      return;
+    }
+
+    const endpoint = isProvider
+      ? `${API_BASE_URL}/api/handshakes/${handshakeId}/confirm-provider/`
+      : `${API_BASE_URL}/api/handshakes/${handshakeId}/confirm-seeker/`;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Update offer state with new handshake data if available
+        if (data.handshake) {
+          setOffer((prevOffer) => ({
+            ...prevOffer,
+            active_handshake: data.handshake,
+          }));
+        } else {
+          // Reload the offer to get updated data
+          window.location.reload();
+        }
+        setMessage(data.message || "Confirmation recorded!");
+      } else {
+        setMessage(data.error || "Failed to confirm completion.");
+      }
+    } catch (err) {
+      setMessage("Network error. Please try again.");
+      console.error("Error:", err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-yellow-50 flex items-center justify-center">
@@ -510,6 +580,21 @@ function OfferDetail() {
     offer.status === "open"
   );
   
+  // Determine if user can confirm completion (provider or seeker who hasn't confirmed yet)
+  const canConfirmCompletion = activeHandshake && 
+    (activeHandshake.status === "accepted" || activeHandshake.status === "in_progress") &&
+    activeHandshake.status !== "completed" && currentUser && (() => {
+      const isProvider = activeHandshake.provider_username && 
+        activeHandshake.provider_username.toLowerCase() === currentUser.toLowerCase();
+      const isSeeker = activeHandshake.seeker_username && 
+        activeHandshake.seeker_username.toLowerCase() === currentUser.toLowerCase();
+      return (isProvider && !activeHandshake.provider_confirmed) ||
+             (isSeeker && !activeHandshake.seeker_confirmed);
+    })();
+  
+  const isProvider = activeHandshake && activeHandshake.provider_username && currentUser &&
+    activeHandshake.provider_username.toLowerCase() === currentUser.toLowerCase();
+  
   // Debug logging (remove in production)
   if (process.env.NODE_ENV === 'development') {
     console.log('Ownership check:', {
@@ -536,27 +621,48 @@ function OfferDetail() {
         <div className="bg-white rounded-2xl shadow-lg p-8">
           <div className="flex justify-between items-start mb-4">
             <h1 className="text-4xl font-bold text-amber-700">{offer.title}</h1>
-            {isOwner && (
-              <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              {/* Confirm Completion Button - Top Right */}
+              {canConfirmCompletion && (
                 <button
-                  onClick={() => navigate(`/offers/${id}/edit`)}
-                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                  onClick={() => handleConfirmCompletion(activeHandshake.id, isProvider)}
+                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm font-medium transition-colors"
                 >
-                  Edit
+                  Confirm Completion
                 </button>
-                <button
-                  onClick={handleDelete}
-                  className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
-                >
-                  Delete
-                </button>
-              </div>
-            )}
+              )}
+              {isOwner && (
+                <>
+                  <button
+                    onClick={() => navigate(`/offers/${id}/edit`)}
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
+                  >
+                    Delete
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="mb-6">
             <p className="text-gray-600 mb-2">
-              <span className="font-semibold">Posted by:</span> {offer.username || "Unknown"}
+              <span className="font-semibold">Posted by:</span>{" "}
+              {offer.user ? (
+                <span
+                  className="text-amber-700 hover:text-amber-900 cursor-pointer underline font-semibold"
+                  onClick={() => navigate(`/profile/${offer.user}`)}
+                >
+                  {offer.username || "Unknown"}
+                </span>
+              ) : (
+                offer.username || "Unknown"
+              )}
             </p>
             <p className="text-gray-600 mb-2">
               <span className="font-semibold">Status:</span>{" "}
@@ -569,7 +675,7 @@ function OfferDetail() {
                     : "bg-gray-100 text-gray-800"
                 }`}
               >
-                {offer.status}
+                {offer.status === "open" ? "Open" : offer.status === "in_progress" ? "In Progress" : offer.status}
               </span>
             </p>
             {offer.created_at && (
@@ -648,11 +754,61 @@ function OfferDetail() {
                   Active Handshake ({activeHandshake.status})
                 </p>
                 <p className="text-sm text-gray-600 mb-2">
-                  Seeker: {activeHandshake.seeker_username || "Anonymous"}
+                  Provider:{" "}
+                  {activeHandshake.provider ? (
+                    <span
+                      className="text-amber-700 hover:text-amber-900 cursor-pointer underline font-semibold"
+                      onClick={() => navigate(`/profile/${activeHandshake.provider}`)}
+                    >
+                      {activeHandshake.provider_username || "Anonymous"}
+                    </span>
+                  ) : (
+                    activeHandshake.provider_username || "Anonymous"
+                  )}
+                </p>
+                <p className="text-sm text-gray-600 mb-2">
+                  Seeker:{" "}
+                  {activeHandshake.seeker ? (
+                    <span
+                      className="text-amber-700 hover:text-amber-900 cursor-pointer underline font-semibold"
+                      onClick={() => navigate(`/profile/${activeHandshake.seeker}`)}
+                    >
+                      {activeHandshake.seeker_username || "Anonymous"}
+                    </span>
+                  ) : (
+                    activeHandshake.seeker_username || "Anonymous"
+                  )}
                 </p>
                 <p className="text-sm text-gray-600 mb-2">
                   Hours: {activeHandshake.hours}
                 </p>
+                
+                {/* Confirmation Status */}
+                {(activeHandshake.status === "accepted" || activeHandshake.status === "in_progress") && (
+                  <div className="mb-3 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700">
+                        <strong>Provider:</strong>{" "}
+                        {activeHandshake.provider_confirmed ? (
+                          <span className="text-green-600">✓ Confirmed</span>
+                        ) : (
+                          <span className="text-gray-500">Pending</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700">
+                        <strong>Seeker:</strong>{" "}
+                        {activeHandshake.seeker_confirmed ? (
+                          <span className="text-green-600">✓ Confirmed</span>
+                        ) : (
+                          <span className="text-gray-500">Pending</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Show accept/decline buttons for owner when handshake is proposed */}
                 {isOwner && activeHandshake.status === "proposed" && (
                   <div className="flex gap-2 mt-4">
@@ -670,8 +826,61 @@ function OfferDetail() {
                     </button>
                   </div>
                 )}
+
+                {/* Waiting message if user confirmed but partner hasn't */}
+                {(activeHandshake.status === "accepted" || activeHandshake.status === "in_progress") && 
+                 activeHandshake.status !== "completed" && (() => {
+                  const isProvider = activeHandshake.provider_username && currentUser &&
+                    activeHandshake.provider_username.toLowerCase() === currentUser.toLowerCase();
+                  const isSeeker = activeHandshake.seeker_username && currentUser &&
+                    activeHandshake.seeker_username.toLowerCase() === currentUser.toLowerCase();
+                  
+                  if ((isProvider && activeHandshake.provider_confirmed && !activeHandshake.seeker_confirmed) ||
+                      (isSeeker && activeHandshake.seeker_confirmed && !activeHandshake.provider_confirmed)) {
+                    return (
+                      <p className="text-sm text-amber-600 mt-2 font-medium">
+                        ⏳ Waiting for partner to confirm...
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {/* Completed Status */}
+                {activeHandshake.status === "completed" && (
+                  <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <p className="text-sm text-green-700 font-medium mb-3">
+                      ✓ Service Completed! Beellars have been transferred.
+                    </p>
+                    {/* Rating Section */}
+                    {currentUser && (() => {
+                      const isProvider = activeHandshake.provider_username && 
+                        activeHandshake.provider_username.toLowerCase() === currentUser.toLowerCase();
+                      const partnerName = isProvider 
+                        ? activeHandshake.seeker_username 
+                        : activeHandshake.provider_username;
+                      
+                      return ratingStatus?.has_rated ? (
+                        <p className="text-sm text-amber-600 font-medium">
+                          ✓ Rating submitted
+                        </p>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setPartnerName(partnerName);
+                            setRatingModalOpen(true);
+                          }}
+                          className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded text-sm font-medium transition-colors"
+                        >
+                          Rate {partnerName}
+                        </button>
+                      );
+                    })()}
+                  </div>
+                )}
+
                 {/* Show chat button only for owner or accepted partner */}
-                {activeHandshake.status !== "proposed" && (
+                {activeHandshake.status !== "proposed" && activeHandshake.status !== "completed" && (
                   (isOwner || 
                    (activeHandshake.seeker_username && currentUser && 
                     activeHandshake.seeker_username.toLowerCase() === currentUser.toLowerCase()) ||
@@ -703,12 +912,12 @@ function OfferDetail() {
             {message && (
               <p
                 className={`mt-4 ${
-                  message.includes("success") || message.includes("accepted")
+                  message.includes("success") || message.includes("accepted") || message.includes("Completed")
                     ? "text-green-600"
                     : "text-red-600"
                 }`}
               >
-                {message}
+                {message.includes("Service Completed") ? "" : message}
               </p>
             )}
           </div>
@@ -730,7 +939,17 @@ function OfferDetail() {
                 {questions.map((q) => (
                   <div key={q.id} className="bg-gray-50 p-4 rounded-lg">
                     <p className="font-semibold text-sm text-gray-600 mb-1">
-                      {q.author_username} asked:
+                      {q.author ? (
+                        <span
+                          className="text-amber-700 hover:text-amber-900 cursor-pointer underline"
+                          onClick={() => navigate(`/profile/${q.author}`)}
+                        >
+                          {q.author_username}
+                        </span>
+                      ) : (
+                        q.author_username
+                      )}{" "}
+                      asked:
                     </p>
                     <p className="text-gray-800 mb-2">{q.content}</p>
                     {q.answer ? (
@@ -873,7 +1092,16 @@ function OfferDetail() {
                               : "bg-white text-gray-800 max-w-[80%]"
                           }`}
                         >
-                          <p className="text-xs opacity-75 mb-1">{msg.sender_username}</p>
+                          <p
+                            className="text-xs opacity-75 mb-1 cursor-pointer hover:underline"
+                            onClick={() => {
+                              if (msg.sender) {
+                                navigate(`/profile/${msg.sender}`);
+                              }
+                            }}
+                          >
+                            {msg.sender_username}
+                          </p>
                           <p>{msg.content}</p>
                           <p className="text-xs opacity-75 mt-1">
                             {new Date(msg.created_at).toLocaleTimeString()}
@@ -909,6 +1137,52 @@ function OfferDetail() {
           )}
         </div>
       </div>
+
+      {/* Rating Modal */}
+      {offer?.active_handshake && offer.active_handshake.status === "completed" && (
+        <RatingModal
+          handshake={offer.active_handshake}
+          partnerName={partnerName}
+          isOpen={ratingModalOpen}
+          onClose={() => {
+            setRatingModalOpen(false);
+            setPartnerName("");
+          }}
+          onSubmit={async (ratingData) => {
+            const token = localStorage.getItem("access");
+            if (!token || !offer.active_handshake) {
+              throw new Error("Missing token or handshake");
+            }
+
+            const response = await fetch(
+              `${API_BASE_URL}/api/ratings/${offer.active_handshake.id}/`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(ratingData),
+              }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+              throw new Error(data.error || "Failed to submit rating.");
+            }
+
+            // Update rating status
+            setRatingStatus({
+              has_rated: true,
+              partner_has_rated: ratingStatus?.partner_has_rated || false,
+            });
+
+            setRatingModalOpen(false);
+            setPartnerName("");
+          }}
+        />
+      )}
     </div>
   );
 }

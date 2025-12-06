@@ -214,6 +214,10 @@ The system should automatically update the post status to “in-progress” afte
 
 When the exchange is completed by both parties, the system should mark the post as “completed” and remove it from active listings.
 
+The system shall automatically create a private conversation channel when a handshake is accepted.
+
+The system shall route all post-related messages into this private conversation after the handshake is accepted.
+
 
 *Timebank*
 
