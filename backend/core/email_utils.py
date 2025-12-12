@@ -48,21 +48,8 @@ def send_activation_email(user, request=None):
     """
     token = generate_activation_token(user)
     
-    # Determine the frontend URL
-    # Try to get from request first (for absolute URLs), then settings/env
-    if request:
-        try:
-            # Try to construct from request
-            scheme = 'https' if request.is_secure() else 'http'
-            host = request.get_host()
-            # Replace backend port/host with frontend
-            if ':8000' in host:
-                host = host.replace(':8000', ':3000')
-            frontend_url = f"{scheme}://{host}"
-        except:
-            frontend_url = getattr(settings, 'FRONTEND_URL', os.getenv('FRONTEND_URL', 'http://localhost:3000'))
-    else:
-        frontend_url = getattr(settings, 'FRONTEND_URL', os.getenv('FRONTEND_URL', 'http://localhost:3000'))
+    # Always use FRONTEND_URL from settings/env (don't derive from request)
+    frontend_url = getattr(settings, 'FRONTEND_URL', os.getenv('FRONTEND_URL', 'http://localhost:3000'))
     
     # Create activation URL
     activation_url = f"{frontend_url}/activate/{token}"
@@ -246,18 +233,8 @@ def send_password_reset_email(user, request=None):
     """
     token = generate_password_reset_token(user)
     
-    # Determine the frontend URL
-    if request:
-        try:
-            scheme = 'https' if request.is_secure() else 'http'
-            host = request.get_host()
-            if ':8000' in host:
-                host = host.replace(':8000', ':3000')
-            frontend_url = f"{scheme}://{host}"
-        except:
-            frontend_url = getattr(settings, 'FRONTEND_URL', os.getenv('FRONTEND_URL', 'http://localhost:3000'))
-    else:
-        frontend_url = getattr(settings, 'FRONTEND_URL', os.getenv('FRONTEND_URL', 'http://localhost:3000'))
+    # Always use FRONTEND_URL from settings/env (don't derive from request)
+    frontend_url = getattr(settings, 'FRONTEND_URL', os.getenv('FRONTEND_URL', 'http://localhost:3000'))
     
     # Create reset URL
     reset_url = f"{frontend_url}/reset-password/{token}"
