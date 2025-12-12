@@ -1,0 +1,14 @@
+name: the-hive-frontend
+static_sites:
+  - name: frontend
+    source_dir: /
+    build_command: npm install && npm run build
+    output_dir: build
+    catchall_document: index.html
+    environment_slug: node-js
+    envs:
+      - key: REACT_APP_API_BASE_URL
+        value: ${REACT_APP_API_BASE_URL}
+    routes:
+      - path: /
+
