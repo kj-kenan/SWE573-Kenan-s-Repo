@@ -246,7 +246,7 @@ def resend_activation(request):
         
         if email_sent:
             return Response({
-                "message": "Activation email has been sent. Please check your inbox (or console if using console backend)."
+                "message": "Activation email has been sent. Please check your inbox."
             }, status=status.HTTP_200_OK)
         else:
             return Response({

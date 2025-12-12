@@ -126,8 +126,7 @@ def send_activation_email(user, request=None):
             html_message=html_message,
             fail_silently=False,
         )
-        print(f"✅ Email sent successfully to {user.email}")
-        print(f"   (If using console backend, check server console/terminal above)\n")
+        print(f"✅ Email sent successfully to {user.email}\n")
         return True
     except Exception as e:
         import traceback
@@ -311,8 +310,7 @@ def send_password_reset_email(user, request=None):
             html_message=html_message,
             fail_silently=False,
         )
-        print(f"✅ Password reset email sent successfully to {user.email}")
-        print(f"   (If using console backend, check server console/terminal above)\n")
+        print(f"✅ Password reset email sent successfully to {user.email}\n")
         return True
     except Exception as e:
         import traceback
