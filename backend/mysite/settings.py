@@ -13,9 +13,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only")
 
 
-DEBUG = True
+# Production settings
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',') if os.getenv('ALLOWED_HOSTS') else ['*']
 
-ALLOWED_HOSTS = ["*"]
+# Security settings for production
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'True').lower() == 'true'
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+else:
+    SECURE_PROXY_SSL_HEADER = None
+    SECURE_SSL_REDIRECT = False
 
 
 INSTALLED_APPS = [
@@ -64,44 +74,58 @@ TEMPLATES = [
 ]
 
 
-# Database configuration - uses SQLite locally if DATABASE_URL not set or FORCE_SQLITE is True
+# Database configuration - prefers DATABASE_URL, falls back to SQLite in dev
 FORCE_SQLITE = os.getenv('FORCE_SQLITE', 'False').lower() == 'true'
 DATABASE_URL = os.environ.get('DATABASE_URL') if not FORCE_SQLITE else None
 
 if DATABASE_URL and not FORCE_SQLITE:
     try:
+        # DigitalOcean uses DATABASE_URL with SSL required
         DATABASES = {
             'default': dj_database_url.config(
                 default=DATABASE_URL,
                 conn_max_age=600,
-                ssl_require=os.getenv('DATABASE_SSL_REQUIRE', 'False').lower() == 'true'
+                ssl_require=os.getenv('DATABASE_SSL_REQUIRE', 'True').lower() == 'true'
             )
         }
     except Exception as e:
         print(f"Warning: Failed to connect to remote database: {e}")
-        print("Falling back to SQLite for local development.")
+        if DEBUG:
+            print("Falling back to SQLite for local development.")
+            DATABASES = {
+                'default': {
+                    'ENGINE': 'django.db.backends.sqlite3',
+                    'NAME': BASE_DIR / 'db.sqlite3',
+                }
+            }
+        else:
+            # In production, don't fallback - fail loudly
+            raise
+else:
+    # Local development - use SQLite
+    if DEBUG:
         DATABASES = {
             'default': {
                 'ENGINE': 'django.db.backends.sqlite3',
                 'NAME': BASE_DIR / 'db.sqlite3',
             }
         }
-else:
-    # Local development - use SQLite
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+    else:
+        # Production must have DATABASE_URL
+        raise ValueError("DATABASE_URL environment variable is required in production")
 
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://the-hive-frontend.netlify.app",
-    "https://jolly-churros-6487ef.netlify.app",
-]
+# CORS settings - allow frontend domains
+CORS_ALLOWED_ORIGINS = os.getenv(
+    'CORS_ALLOWED_ORIGINS',
+    'http://localhost:3000,http://127.0.0.1:3000'
+).split(',')
+
+# CSRF trusted origins (same as CORS for production)
+CSRF_TRUSTED_ORIGINS = os.getenv(
+    'CSRF_TRUSTED_ORIGINS',
+    'http://localhost:3000,http://127.0.0.1:3000'
+).split(',')
 
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -161,3 +185,32 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER if EMAIL_HO
 
 # Frontend URL for email links
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
+# Logging configuration (logs to stdout/stderr for DigitalOcean)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': os.getenv('LOG_LEVEL', 'INFO'),
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+    },
+}

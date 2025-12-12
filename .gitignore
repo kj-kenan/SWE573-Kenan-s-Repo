@@ -22,4 +22,10 @@ Desktop.ini
 # Environment variables
 .env
 *.env
+.env.local
+.env.production
+
+# Production artifacts
+*.log
+*.pid
 

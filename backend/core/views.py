@@ -35,7 +35,9 @@ def home(request):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def health(request):
+    """Health check endpoint for monitoring"""
     return Response({"status": "ok"})
 
 

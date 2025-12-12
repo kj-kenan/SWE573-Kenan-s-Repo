@@ -1,0 +1,63 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+venv/
+env/
+ENV/
+
+# Django
+*.log
+*.pot
+*.pyc
+db.sqlite3
+/media
+/staticfiles
+local_settings.py
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Documentation
+*.md
+docs/
+DEPLOYMENT*.md
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Other
+*.txt
+!requirements.txt
+

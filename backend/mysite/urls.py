@@ -24,5 +24,16 @@ urlpatterns = [
 ]
 
 # Serve media files in development
+# NOTE: In production, media files are stored locally (lost on container restart)
+# For proper production, migrate to DigitalOcean Spaces - see DEPLOYMENT.md
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+else:
+    # Production: Serve media files (temporary - use Spaces for production)
+    # Files stored in MEDIA_ROOT will be lost when container restarts
+    # This is a temporary solution for initial deployment
+    from django.views.static import serve
+    from django.urls import re_path
+    urlpatterns += [
+        re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+    ]
