@@ -462,19 +462,6 @@ function Home() {
         </div>
       </section>
 
-      <section className="py-12 bg-amber-100/50">
-        <h3 className="text-2xl font-semibold mb-4">Explore by Tag</h3>
-        <div className="flex flex-wrap justify-center gap-3">
-          {tags.map((tag) => (
-            <span
-              key={tag}
-              className="bg-amber-300 hover:bg-amber-500 text-gray-800 font-medium px-4 py-2 rounded-full cursor-pointer transition-colors"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

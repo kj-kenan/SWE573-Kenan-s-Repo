@@ -745,14 +745,6 @@ function OfferDetail() {
                 <h3 className="font-semibold text-amber-700 mb-1">Location</h3>
                 <p className="text-gray-700">
                   {offer.latitude.toFixed(6)}, {offer.longitude.toFixed(6)}
-                  {offer.fuzzy_lat && offer.fuzzy_lng && (
-                    <span className="text-xs text-gray-500 block mt-1">
-                      (Displayed on map with privacy offset: {offer.fuzzy_lat.toFixed(6)}, {offer.fuzzy_lng.toFixed(6)})
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Note: Your exact location is stored, but shown on maps with a 100-200m offset for privacy.
                 </p>
               </div>
             )}
