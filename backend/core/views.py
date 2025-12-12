@@ -465,18 +465,24 @@ def profile_detail(request, user_id=None):
 @permission_classes([IsAuthenticated])
 def profile_own(request):
     """Get or update current user's own profile"""
-    profile, created = UserProfile.objects.get_or_create(user=request.user)
-    
-    if request.method == "GET":
-        serializer = UserProfileSerializer(profile, context={"request": request})
-        return Response(serializer.data)
-    
-    # PUT/PATCH - update own profile
-    serializer = UserProfileSerializer(profile, data=request.data, partial=True, context={"request": request})
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        profile, created = UserProfile.objects.get_or_create(user=request.user)
+        
+        if request.method == "GET":
+            serializer = UserProfileSerializer(profile, context={"request": request})
+            return Response(serializer.data)
+        
+        # PUT/PATCH - update own profile
+        serializer = UserProfileSerializer(profile, data=request.data, partial=True, context={"request": request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response(
+            {"error": str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -894,13 +900,23 @@ def handshake_accept(request, handshake_id):
     if user != handshake.provider:
         return Response({"error": "Only provider can accept this handshake."}, status=status.HTTP_403_FORBIDDEN)
 
+    # For offers: check if max_participants is reached
+    if handshake.offer:
+        accepted_count = handshake.offer.get_accepted_participant_count()
+        if accepted_count >= handshake.offer.max_participants:
+            return Response(
+                {"error": f"This offer has reached its maximum number of participants ({handshake.offer.max_participants})."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     handshake.status = "accepted"
     handshake.save()
 
-    # Mark post as "in_progress" (status already updated to "in_progress" in the accept endpoint)
+    # Mark post as "in_progress" when at least one handshake is accepted
     if handshake.offer:
-        handshake.offer.status = "in_progress"
-        handshake.offer.save()
+        if handshake.offer.status == "open":
+            handshake.offer.status = "in_progress"
+            handshake.offer.save()
     elif handshake.request:
         handshake.request.status = "in_progress"
         handshake.request.save()
@@ -927,49 +943,88 @@ def _complete_handshake(handshake):
     Helper function to handle handshake completion:
     - Transfer Beellars
     - Create transaction record
-    - Mark post as completed
+    - Mark post as completed (for requests, or offers when ALL handshakes complete)
     - Update handshake status
     
     Note: Both provider_confirmed and seeker_confirmed should already be True
     when this function is called.
+    
+    For offers: Each participant pays 1 Beellar, owner earns 1 Beellar TOTAL (not per participant).
+    For requests: Standard 1-to-1 transaction.
     """
     hours = handshake.hours
     provider_profile = handshake.provider.profile
     seeker_profile = handshake.seeker.profile
 
-    # Check sufficient balance before transfer
-    if seeker_profile.timebank_balance < hours:
-        return False, "Insufficient Beellar balance."
-
-    # Transfer Beellars (provider earns, seeker spends)
-    seeker_profile.timebank_balance -= hours
-    provider_profile.timebank_balance += hours
-    seeker_profile.save()
-    provider_profile.save()
-
-    # Create transaction record
-    Transaction.objects.create(
-        handshake=handshake,
-        sender=handshake.seeker,
-        receiver=handshake.provider,
-        amount=hours,
-    )
-
-    # Mark post as completed (inactive)
+    # Transfer Beellars
     if handshake.offer:
-        handshake.offer.status = "completed"
-        handshake.offer.save()
-    elif handshake.request:
+        # Check sufficient balance before transfer (offers always cost 1 Beellar per participant)
+        if seeker_profile.timebank_balance < 1:
+            return False, "Insufficient Beellar balance. Participant needs at least 1 Beellar."
+        # Multi-participant offer: each participant pays 1 Beellar, owner gets 1 Beellar total
+        # Check completed count BEFORE marking this one as completed
+        completed_count_before = handshake.offer.handshakes.filter(status="completed").count()
+        
+        # Participant pays 1 Beellar
+        seeker_profile.timebank_balance -= 1
+        seeker_profile.save()
+        
+        # Owner earns 1 Beellar only on first completion
+        if completed_count_before == 0:
+            provider_profile.timebank_balance += 1
+            provider_profile.save()
+        
+        # Create transaction record
+        Transaction.objects.create(
+            handshake=handshake,
+            sender=handshake.seeker,
+            receiver=handshake.provider,
+            amount=1,  # Always 1 Beellar for offers
+        )
+        
+        # Mark handshake as completed first
+        handshake.status = "completed"
+        handshake.save()
+        
+        # Check if ALL accepted handshakes are now completed
+        # Count handshakes that are still accepted/in_progress (excluding declined)
+        remaining_active = handshake.offer.handshakes.filter(
+            status__in=["accepted", "in_progress"]
+        ).exclude(status="declined").count()
+        
+        # Mark offer as completed only when no active handshakes remain
+        if remaining_active == 0:
+            handshake.offer.status = "completed"
+            handshake.offer.save()
+        return True, "Handshake completed successfully. Beellars transferred."
+    else:
+        # Request: standard 1-to-1 transaction
+        # Check sufficient balance before transfer
+        if seeker_profile.timebank_balance < hours:
+            return False, "Insufficient Beellar balance."
+        
+        seeker_profile.timebank_balance -= hours
+        provider_profile.timebank_balance += hours
+        seeker_profile.save()
+        provider_profile.save()
+
+        # Create transaction record
+        Transaction.objects.create(
+            handshake=handshake,
+            sender=handshake.seeker,
+            receiver=handshake.provider,
+            amount=hours,
+        )
+
+        # Mark request as completed (requests are always 1-to-1)
         handshake.request.status = "completed"
         handshake.request.save()
-
-    # Mark handshake as completed
-    # Note: The model's save() method will also set status="completed" when both confirm
-    # but we explicitly set it here to ensure it's done after the transfer
-    handshake.status = "completed"
-    handshake.save()
-
-    return True, "Handshake completed successfully. Beellars transferred."
+        
+        # Mark handshake as completed
+        handshake.status = "completed"
+        handshake.save()
+        
+        return True, "Handshake completed successfully. Beellars transferred."
 
 
 @api_view(["POST"])
@@ -1583,6 +1638,250 @@ def tags_list(request):
         unique_tags = [tag for tag in unique_tags if query in tag.lower()]
     
     return Response({"tags": unique_tags}, status=status.HTTP_200_OK)
+
+
+def is_valid_service_tag(label, description):
+    """
+    Filter function to determine if a Wikidata entity is suitable as a service/activity tag.
+    Excludes human names, celebrities, and unrelated entities.
+    Prefers service-related, activity, or skill-like tags.
+    
+    Args:
+        label: The entity label (e.g., "Cooking")
+        description: The entity description (e.g., "preparation of food")
+    
+    Returns:
+        bool: True if the tag is suitable for services/activities, False otherwise
+    """
+    if not label:
+        return False
+    
+    # If no description, reject it (better to filter out than show irrelevant tags)
+    if not description:
+        return False
+    
+    description_lower = description.lower()
+    label_lower = label.lower()
+    
+    # Exclude human-related keywords
+    human_keywords = [
+        "human", "person", "people", "individual",
+        "male", "female", "man", "woman", "boy", "girl",
+        "actor", "actress", "politician", "footballer", "football player",
+        "scientist", "writer", "author", "singer", "musician",
+        "artist", "painter", "director", "producer", "ceo",
+        "president", "minister", "mayor", "governor", "leader",
+        "character", "fictional character", "fictional",
+        "born", "died", "century", "era", "age",
+    ]
+    
+    # Check if description contains human-related keywords
+    for keyword in human_keywords:
+        if keyword in description_lower:
+            return False
+    
+    # Exclude geographical/location-related keywords
+    location_keywords = [
+        "city", "town", "village", "place", "location", "country", "region",
+        "state", "province", "district", "county", "municipality",
+        "building", "monument", "museum", "airport", "station",
+        "river", "mountain", "lake", "island", "continent",
+    ]
+    
+    for keyword in location_keywords:
+        if keyword in description_lower:
+            return False
+    
+    # Additional check: if label itself looks like a person's name
+    # (e.g., "John Smith", "Maria Garcia" - has two capitalized words that might be names)
+    words = label.split()
+    if len(words) == 2 and words[0][0].isupper() and words[1][0].isupper():
+        # Could be a name, reject if description suggests person
+        if any(keyword in description_lower for keyword in ["human", "person", "born", "died", "actor", "politician"]):
+            return False
+    
+    # Additional check: Reject if it's clearly a proper noun (e.g., company names, brand names)
+    # But allow common nouns that are activities/services
+    if label[0].isupper() and len(words) == 1:
+        # Single capitalized word - could be a proper noun
+        # Check if description suggests it's not a service/activity
+        proper_noun_indicators = ["company", "corporation", "organization", "institution", "university", "school"]
+        if any(indicator in description_lower for indicator in proper_noun_indicators):
+            return False
+    
+    # If we've passed all exclusion checks, accept it
+    # The filtering is conservative - we only exclude obvious non-service entities
+    return True
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def location_diagnostic(request, offer_id=None):
+    """
+    Diagnostic endpoint to help debug location issues.
+    Shows both real and fuzzy coordinates for an offer.
+    GET /api/offers/<offer_id>/location-diagnostic/
+    """
+    if not offer_id:
+        return Response(
+            {"error": "Offer ID is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        offer = Offer.objects.get(pk=offer_id)
+    except Offer.DoesNotExist:
+        return Response(
+            {"error": "Offer not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Check if user owns the offer or is admin
+    if offer.user != request.user and not (request.user.is_staff or request.user.is_superuser):
+        return Response(
+            {"error": "You can only view diagnostics for your own offers"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    from .location_utils import get_fuzzy_coordinates, calculate_distance_km
+    
+    real_lat = offer.latitude
+    real_lng = offer.longitude
+    
+    if real_lat is None or real_lng is None:
+        return Response({
+            "error": "Offer has no location data",
+            "offer_id": offer_id,
+            "has_latitude": real_lat is not None,
+            "has_longitude": real_lng is not None,
+        })
+    
+    # Calculate fuzzy coordinates
+    owner_id = offer.user.id if offer.user else None
+    fuzzy_lat, fuzzy_lng = get_fuzzy_coordinates(
+        real_lat,
+        real_lng,
+        offer.id,
+        created_at=offer.created_at,
+        owner_id=owner_id
+    )
+    
+    # Calculate offset distance
+    offset_distance = calculate_distance_km(real_lat, real_lng, fuzzy_lat, fuzzy_lng) if fuzzy_lat and fuzzy_lng else 0
+    
+    return Response({
+        "offer_id": offer_id,
+        "offer_title": offer.title,
+        "real_coordinates": {
+            "latitude": real_lat,
+            "longitude": real_lng,
+        },
+        "fuzzy_coordinates": {
+            "latitude": fuzzy_lat,
+            "longitude": fuzzy_lng,
+        },
+        "offset_distance_meters": round(offset_distance * 1000, 2),
+        "offset_distance_km": round(offset_distance, 4),
+        "created_at": offer.created_at,
+        "owner_id": owner_id,
+        "note": "Fuzzy coordinates are used on maps for privacy (100-200m offset). Real coordinates are stored in database."
+    })
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def tags_wikidata(request):
+    """
+    Proxy endpoint for Wikidata search API.
+    Returns simplified and filtered results from Wikidata wbsearchentities API.
+    Filters out human names, celebrities, places, and other non-service entities.
+    GET /api/tags/wikidata/?q=<search_term>
+    """
+    import urllib.request
+    import urllib.parse
+    import json
+    from django.core.cache import cache
+    
+    query = request.query_params.get("q", "").strip()
+    
+    # Return empty list if query is too short
+    if len(query) < 2:
+        return Response({"results": []}, status=status.HTTP_200_OK)
+    
+    # Check cache first (5 minute cache)
+    cache_key = f"wikidata_search_{query.lower()}"
+    cached_result = cache.get(cache_key)
+    if cached_result is not None:
+        return Response(cached_result, status=status.HTTP_200_OK)
+    
+    try:
+        # Build Wikidata API URL with type=item parameter
+        params = {
+            "action": "wbsearchentities",
+            "search": query,
+            "language": "en",
+            "format": "json",
+            "limit": 20,  # Fetch more to filter, then return top 10
+            "type": "item",
+        }
+        url = "https://www.wikidata.org/w/api.php?" + urllib.parse.urlencode(params)
+        
+        # Create request with User-Agent header (Wikidata requires this to avoid 403)
+        req = urllib.request.Request(url)
+        req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36')
+        
+        # Make request with timeout
+        with urllib.request.urlopen(req, timeout=5) as response:
+            response_data = response.read().decode('utf-8')
+            data = json.loads(response_data)
+            
+            # Extract and filter results
+            filtered_results = []
+            if "search" in data and isinstance(data["search"], list):
+                for item in data["search"]:
+                    label = item.get("label", "")
+                    description = item.get("description", "")
+                    wikidata_id = item.get("id", "")
+                    
+                    # Only process items with valid labels
+                    if not label:
+                        continue
+                    
+                    # Filter using our validation function
+                    if is_valid_service_tag(label, description):
+                        filtered_results.append({
+                            "label": label,
+                            "description": description or "",  # Handle missing descriptions gracefully
+                            "wikidata_id": wikidata_id,
+                        })
+                        
+                        # Limit to 10 results after filtering
+                        if len(filtered_results) >= 10:
+                            break
+            
+            print(f"Query: '{query}' - Filtered {len(filtered_results)} valid service tags from {len(data.get('search', []))} total results")
+            
+            # Cache the result for 5 minutes
+            cache.set(cache_key, {"results": filtered_results}, 300)
+            
+            return Response({"results": filtered_results}, status=status.HTTP_200_OK)
+            
+    except urllib.error.URLError as e:
+        # Network error - return empty list gracefully
+        print(f"Wikidata API URLError: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return Response({"results": []}, status=status.HTTP_200_OK)
+    except json.JSONDecodeError as e:
+        # JSON parsing error
+        print(f"Wikidata API JSON decode error: {e}")
+        return Response({"results": []}, status=status.HTTP_200_OK)
+    except Exception as e:
+        # Any other error - return empty list gracefully
+        print(f"Error fetching from Wikidata: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return Response({"results": []}, status=status.HTTP_200_OK)
 
 
 # ---------------------------------------------------------------------------

@@ -152,6 +152,12 @@ The system shall validate updated post data before saving changes.
 
 The system shall prevent deletion of posts that have an active handshake.
 
+The system shall allow offer creators to specify a maximum number of participants when creating or editing an offer.
+
+The system shall not allow participant limits to be set for requests.
+
+The system shall display remaining participant slots for offers.
+
 *Map*
 
 The system shall display all active offers and needs on an interactive map
@@ -218,6 +224,14 @@ The system shall automatically create a private conversation channel when a hand
 
 The system shall route all post-related messages into this private conversation after the handshake is accepted.
 
+The system shall allow multiple users to participate in a single offer, up to the defined maximum participant limit.
+
+Each participant shall have an independent handshake with the offer owner.
+
+The system shall prevent new handshake requests once the offer’s participant limit is reached.
+
+Requests shall continue to support only a single participant.
+
 
 *Timebank*
 
@@ -252,6 +266,12 @@ The system shall automatically add a transaction entry when a handshake is compl
 The system shall allow sorting or filtering transaction history by date or type.
 
 The Timebank tab shall only be visible to authenticated users.
+
+For multi-participant offers, each participant shall spend one Beellar upon service completion.
+
+For multi-participant offers, the offer owner shall earn one Beellar total per completed offer, regardless of the number of participants.
+
+The system shall record a separate debit transaction for each participant and a single credit transaction for the offer owner.
 
 *Ratings*
 

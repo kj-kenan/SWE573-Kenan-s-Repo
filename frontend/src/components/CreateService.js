@@ -1,5 +1,39 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import TagSelector from "./TagSelector";
+import userLocationIcon from "../location.svg";
+
+// Fix for default marker icons in react-leaflet
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+});
+
+// Component to handle map clicks for location selection
+function MapClickHandler({ onLocationSelect }) {
+  useMapEvents({
+    click: (e) => {
+      const { lat, lng } = e.latlng;
+      onLocationSelect(lat, lng);
+    },
+  });
+  return null;
+}
+
+// Component to update map view when coordinates change
+function MapUpdater({ center }) {
+  const map = useMap();
+  React.useEffect(() => {
+    if (center && center[0] && center[1]) {
+      map.setView(center, 15);
+    }
+  }, [center, map]);
+  return null;
+}
 
 function CreateService() {
   const [serviceType, setServiceType] = useState("offer"); // "offer" | "request"
@@ -10,12 +44,20 @@ function CreateService() {
     duration: "",
     latitude: "",
     longitude: "",
+    max_participants: 1,
   });
 
   const [selectedTags, setSelectedTags] = useState([]);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+  const [showMapPreview, setShowMapPreview] = useState(false);
+  const [locationSource, setLocationSource] = useState(null); // "gps", "network", "manual", or null
+  const [locationAccuracy, setLocationAccuracy] = useState(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [locationWatchId, setLocationWatchId] = useState(null);
+  const bestPositionRef = useRef(null);
+  const bestAccuracyRef = useRef(Infinity);
 
   // ✅ environment değişkeni + fallback
   const API_BASE_URL =
@@ -32,22 +74,199 @@ function CreateService() {
       setMessage("Location is not supported by your browser.");
       return;
     }
-    navigator.geolocation.getCurrentPosition(
+    
+    // Stop any existing watch
+    if (locationWatchId !== null) {
+      navigator.geolocation.clearWatch(locationWatchId);
+    }
+    
+    setIsGettingLocation(true);
+    setMessage("Acquiring GPS signal...");
+    setIsError(false);
+    
+    const options = {
+      enableHighAccuracy: true, // Request GPS, not network
+      timeout: 45000, // 45 seconds to allow GPS to lock
+      maximumAge: 0 // Never use cached location
+    };
+    
+    bestAccuracyRef.current = Infinity;
+    bestPositionRef.current = null;
+    let attempts = 0;
+    const maxAttempts = 30; // Check up to 30 times over 45 seconds
+    
+    // Use watchPosition to get multiple readings and wait for GPS
+    const watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setFormData((p) => ({
-          ...p,
-          latitude: latitude.toFixed(6),
-          longitude: longitude.toFixed(6),
-        }));
-        setIsError(false);
-        setMessage("Location captured.");
+        attempts++;
+        const { latitude, longitude, accuracy } = pos.coords;
+        const accuracyMeters = accuracy ? Math.round(accuracy) : Infinity;
+        
+        // Track the best (most accurate) position we've received
+        if (accuracyMeters < bestAccuracyRef.current) {
+          bestAccuracyRef.current = accuracyMeters;
+          bestPositionRef.current = pos;
+          
+          // Update UI with current best reading
+          setFormData((p) => ({
+            ...p,
+            latitude: latitude.toFixed(6),
+            longitude: longitude.toFixed(6),
+          }));
+          
+          // Determine source based on accuracy
+          let source = "network";
+          if (accuracyMeters < 100) {
+            source = accuracyMeters < 20 ? "gps" : "network";
+          }
+          
+          let statusMsg = "";
+          if (accuracyMeters > 1000) {
+            // Very poor accuracy - likely IP-based, stop early
+            statusMsg = `Location accuracy very poor (±${(accuracyMeters/1000).toFixed(1)}km). Stopping...`;
+          } else if (accuracyMeters > 100) {
+            statusMsg = `Acquiring GPS signal... (±${accuracyMeters}m)`;
+          } else if (accuracyMeters > 50) {
+            statusMsg = `Improving accuracy... (±${accuracyMeters}m)`;
+          } else {
+            statusMsg = `GPS locked! (±${accuracyMeters}m)`;
+          }
+          
+          setMessage(statusMsg);
+          setLocationSource(source);
+          setLocationAccuracy(accuracyMeters);
+          setShowMapPreview(true);
+        }
+        
+        // If accuracy is very poor (>1000m), it's likely IP-based - stop early and let user manually set
+        if (accuracyMeters > 1000) {
+          navigator.geolocation.clearWatch(watchId);
+          setLocationWatchId(null);
+          setIsGettingLocation(false);
+          
+          setLocationSource("network");
+          setMessage(`⚠️ Automatic location is very inaccurate (±${(accuracyMeters/1000).toFixed(1)}km). Please click on the map below to set your exact location.`);
+          
+          return;
+        }
+        
+        // If we get a good GPS reading (< 30m for GPS, or < 50m for network), stop watching
+        // But wait a bit longer if we're still improving to get the best possible reading
+        const isGoodGPS = accuracyMeters < 20;
+        const isAcceptableNetwork = accuracyMeters >= 20 && accuracyMeters < 50;
+        
+        if (isGoodGPS) {
+          // For GPS, stop immediately once we get good accuracy
+          navigator.geolocation.clearWatch(watchId);
+          setLocationWatchId(null);
+          setIsGettingLocation(false);
+          
+          setLocationSource("gps");
+          setMessage(`Location captured! Accuracy: ±${accuracyMeters}m. Please verify on the map below.`);
+          
+          return;
+        } else if (isAcceptableNetwork && attempts > 10) {
+          // For network-based, wait for at least 10 readings to ensure we have the best possible
+          // Only stop if accuracy hasn't improved in the last few readings
+          navigator.geolocation.clearWatch(watchId);
+          setLocationWatchId(null);
+          setIsGettingLocation(false);
+          
+          setLocationSource("network");
+          setMessage(`Location captured! Accuracy: ±${accuracyMeters}m. Please verify on the map below.`);
+          
+          return;
+        }
+        
+        // If we've tried many times without good accuracy, use the best we have
+        if (attempts >= maxAttempts) {
+          navigator.geolocation.clearWatch(watchId);
+          setLocationWatchId(null);
+          setIsGettingLocation(false);
+          
+          if (bestPositionRef.current) {
+            const finalAccuracy = Math.round(bestPositionRef.current.coords.accuracy);
+            const finalSource = finalAccuracy < 20 ? "gps" : "network";
+            
+            setLocationSource(finalSource);
+            setLocationAccuracy(finalAccuracy);
+            
+            let finalMsg = `Location captured. Accuracy: ±${finalAccuracy}m`;
+            if (finalAccuracy > 100) {
+              finalMsg += ". ⚠️ Location may be inaccurate. Please verify and adjust on the map if needed.";
+            } else {
+              finalMsg += ". Please verify the location on the map below.";
+            }
+            
+            setMessage(finalMsg);
+          }
+        }
       },
-      () => {
+      (error) => {
+        navigator.geolocation.clearWatch(watchId);
+        setLocationWatchId(null);
+        setIsGettingLocation(false);
         setIsError(true);
-        setMessage("Could not get location permission.");
-      }
+        
+        let errorMsg = "Could not get location.";
+        if (error.code === 1) {
+          errorMsg = "Location permission denied. Please enable location access in your browser settings.";
+        } else if (error.code === 2) {
+          errorMsg = "Location unavailable. Please check your device's location settings.";
+        } else if (error.code === 3) {
+          errorMsg = "Location request timed out. Please try again.";
+        }
+        setMessage(errorMsg);
+        setShowMapPreview(false);
+      },
+      options
     );
+    
+    setLocationWatchId(watchId);
+    
+    // Fallback: stop watching after timeout even if no good reading
+    setTimeout(() => {
+      // Check if watch is still active by verifying state
+      navigator.geolocation.clearWatch(watchId);
+      
+      // Only update if we're still in "getting location" state (watch wasn't already cleared)
+      setIsGettingLocation((prev) => {
+        if (prev) {
+          setLocationWatchId(null);
+          
+          if (bestPositionRef.current && bestAccuracyRef.current < Infinity) {
+            const finalAccuracy = Math.round(bestPositionRef.current.coords.accuracy);
+            const finalSource = finalAccuracy < 20 ? "gps" : "network";
+            
+            setLocationSource(finalSource);
+            setLocationAccuracy(finalAccuracy);
+            
+            let finalMsg = "";
+            if (finalAccuracy > 1000) {
+              finalMsg = `⚠️ Automatic location is very inaccurate (±${(finalAccuracy/1000).toFixed(1)}km - IP-based). Please click on the map below to set your exact location.`;
+            } else if (finalAccuracy > 100) {
+              finalMsg = `Location captured. Accuracy: ±${finalAccuracy}m. ⚠️ Location may be inaccurate - please verify and adjust on map.`;
+            } else {
+              finalMsg = `Location captured. Accuracy: ±${finalAccuracy}m. Please verify on the map below.`;
+            }
+            setMessage(finalMsg);
+          }
+          return false;
+        }
+        return prev;
+      });
+    }, 45000); // 45 second total timeout
+  };
+
+  const handleMapLocationSelect = (lat, lng) => {
+    setFormData((p) => ({
+      ...p,
+      latitude: lat.toFixed(6),
+      longitude: lng.toFixed(6),
+    }));
+    setLocationSource("manual");
+    setLocationAccuracy(null);
+    setMessage(`Location set manually: ${lat.toFixed(6)}, ${lng.toFixed(6)}. Click on the map again to adjust.`);
   };
 
   const handleSubmit = async (e) => {
@@ -102,9 +321,13 @@ function CreateService() {
           duration: "",
           latitude: "",
           longitude: "",
+          max_participants: 1,
         });
         setSelectedTags([]);
         setAvailableSlots([]);
+        setShowMapPreview(false);
+        setLocationSource(null);
+        setLocationAccuracy(null);
       } else {
         setIsError(true);
         setMessage(data.detail || data.error || "Something went wrong.");
@@ -112,7 +335,6 @@ function CreateService() {
     } catch (err) {
       setIsError(true);
       setMessage("Server connection error.");
-      console.error("Error posting service:", err);
     }
   };
 
@@ -181,6 +403,27 @@ function CreateService() {
               className="block w-full mb-3 p-3 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
 
+            {/* Maximum Participants - Only for Offers */}
+            {serviceType === "offer" && (
+              <div className="mb-3">
+                <label className="block text-sm font-semibold text-amber-700 mb-2">
+                  Maximum Participants
+                </label>
+                <input
+                  type="number"
+                  name="max_participants"
+                  min="1"
+                  value={formData.max_participants}
+                  onChange={handleChange}
+                  required
+                  className="block w-full p-3 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+                <p className="text-xs text-gray-600 mt-1">
+                  How many people can participate in this offer? (Default: 1)
+                </p>
+              </div>
+            )}
+
             {/* Available Dates and Times */}
             <div className="mb-4">
               <label className="block text-sm font-semibold text-amber-700 mb-2">
@@ -235,32 +478,105 @@ function CreateService() {
               setSelectedTags={setSelectedTags}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-              <input
-                type="number"
-                step="any"
-                name="latitude"
-                placeholder="Latitude"
-                value={formData.latitude}
-                onChange={handleChange}
-                className="p-3 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
-              />
-              <input
-                type="number"
-                step="any"
-                name="longitude"
-                placeholder="Longitude"
-                value={formData.longitude}
-                onChange={handleChange}
-                className="p-3 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
-              />
-              <button
-                type="button"
-                onClick={handleUseMyLocation}
-                className="p-3 rounded bg-amber-100 hover:bg-amber-200 border border-amber-300 font-semibold"
-              >
-                Use my location
-              </button>
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-amber-700 mb-2">
+                Location Coordinates
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-2">
+                <input
+                  type="number"
+                  step="any"
+                  name="latitude"
+                  placeholder="Latitude"
+                  value={formData.latitude}
+                  onChange={(e) => {
+                    handleChange(e);
+                    if (e.target.value && formData.longitude) {
+                      setShowMapPreview(true);
+                      setLocationSource("manual");
+                    }
+                  }}
+                  className="p-3 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+                <input
+                  type="number"
+                  step="any"
+                  name="longitude"
+                  placeholder="Longitude"
+                  value={formData.longitude}
+                  onChange={(e) => {
+                    handleChange(e);
+                    if (e.target.value && formData.latitude) {
+                      setShowMapPreview(true);
+                      setLocationSource("manual");
+                    }
+                  }}
+                  className="p-3 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+                <button
+                  type="button"
+                  onClick={handleUseMyLocation}
+                  disabled={isGettingLocation}
+                  className={`p-3 rounded bg-amber-100 hover:bg-amber-200 border border-amber-300 font-semibold transition ${
+                    isGettingLocation ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                >
+                  {isGettingLocation ? "🔄 Getting GPS..." : "📍 Use my location"}
+                </button>
+              </div>
+              
+              {/* Map Preview */}
+              {showMapPreview && formData.latitude && formData.longitude && (
+                <div className="mb-2">
+                  {locationAccuracy !== null && locationAccuracy > 1000 ? (
+                    <div className="mb-2 p-3 bg-orange-50 border-2 border-orange-300 rounded-lg">
+                      <p className="text-sm font-semibold text-orange-800 mb-1">
+                        ⚠️ Automatic location is very inaccurate
+                      </p>
+                      <p className="text-xs text-orange-700">
+                        Please <strong>click on the map below</strong> to set your exact location. This is common on desktop computers without GPS.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-600 mb-1">
+                      Click on the map to adjust your location if needed:
+                    </p>
+                  )}
+                  <div className={`h-64 border-2 rounded-lg overflow-hidden ${
+                    locationAccuracy !== null && locationAccuracy > 1000 
+                      ? "border-orange-400 ring-2 ring-orange-200" 
+                      : "border-amber-300"
+                  }`}>
+                    <MapContainer
+                      key={`${formData.latitude}-${formData.longitude}`}
+                      center={[parseFloat(formData.latitude), parseFloat(formData.longitude)]}
+                      zoom={15}
+                      style={{ height: "100%", width: "100%" }}
+                      scrollWheelZoom={true}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors | © <a href="https://www.maptiler.com/">MapTiler</a>'
+                        url="https://api.maptiler.com/maps/pastel/256/{z}/{x}/{y}.png?key=GpfLIUr8LS7XQvnlcAnU"
+                      />
+                      <Marker
+                        position={[parseFloat(formData.latitude), parseFloat(formData.longitude)]}
+                        icon={L.icon({
+                          iconUrl: userLocationIcon,
+                          iconSize: [40, 40],
+                          iconAnchor: [20, 20],
+                          popupAnchor: [0, -20],
+                        })}
+                      />
+                      <MapClickHandler onLocationSelect={handleMapLocationSelect} />
+                      <MapUpdater center={[parseFloat(formData.latitude), parseFloat(formData.longitude)]} />
+                    </MapContainer>
+                  </div>
+                </div>
+              )}
+              
+              <p className="text-xs text-gray-600">
+                Your exact coordinates are stored. On maps, a 100-200m privacy offset is applied to protect your location.
+              </p>
             </div>
 
             <button

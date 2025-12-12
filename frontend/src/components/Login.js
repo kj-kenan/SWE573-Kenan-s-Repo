@@ -10,6 +10,11 @@ function Login() {
   const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL ||
     "https://swe573-kenan-s-repo.onrender.com";
+  
+  // Log the API URL for debugging (remove in production)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('API Base URL:', API_BASE_URL);
+  }
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -62,7 +67,14 @@ function Login() {
       }
     } catch (error) {
       console.error("Login error:", error);
-      setMessage("Server error. Please try again later.");
+      // Provide more specific error messages
+      if (error.name === "TypeError" && error.message === "Failed to fetch") {
+        setMessage(`Cannot connect to server at ${API_BASE_URL}. Please check if the backend is running and try again.`);
+      } else if (error.message) {
+        setMessage(`Error: ${error.message}`);
+      } else {
+        setMessage("Server error. Please try again later.");
+      }
     }
   };
 

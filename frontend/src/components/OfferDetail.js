@@ -572,28 +572,33 @@ function OfferDetail() {
     currentUser.toLowerCase().trim() === offer.username.toLowerCase().trim()
   );
   const activeHandshake = offer.active_handshake;
-  // Handshake button: only show if NOT owner, user is logged in, no active handshake, and offer is open
+  const allHandshakes = activeHandshake?.all_handshakes || (activeHandshake ? [activeHandshake] : []);
+  const userHandshake = allHandshakes.find(h => 
+    h.seeker_username && currentUser && h.seeker_username.toLowerCase() === currentUser.toLowerCase()
+  );
+  
+  // Handshake button: only show if NOT owner, user is logged in, offer is open, and slots available
   const canSendHandshake = Boolean(
     isLoggedIn && 
     !isOwner && 
-    !activeHandshake && 
-    offer.status === "open"
+    !userHandshake &&
+    offer.status === "open" &&
+    (offer.remaining_slots === undefined || offer.remaining_slots > 0)
   );
   
-  // Determine if user can confirm completion (provider or seeker who hasn't confirmed yet)
-  const canConfirmCompletion = activeHandshake && 
-    (activeHandshake.status === "accepted" || activeHandshake.status === "in_progress") &&
-    activeHandshake.status !== "completed" && currentUser && (() => {
-      const isProvider = activeHandshake.provider_username && 
-        activeHandshake.provider_username.toLowerCase() === currentUser.toLowerCase();
-      const isSeeker = activeHandshake.seeker_username && 
-        activeHandshake.seeker_username.toLowerCase() === currentUser.toLowerCase();
-      return (isProvider && !activeHandshake.provider_confirmed) ||
-             (isSeeker && !activeHandshake.seeker_confirmed);
-    })();
+  // For multi-participant: Check if user has any handshake that needs confirmation
+  const userHandshakeNeedingConfirmation = allHandshakes.find(h => {
+    if (!currentUser) return false;
+    const isProviderForH = h.provider_username && h.provider_username.toLowerCase() === currentUser.toLowerCase();
+    const isSeekerForH = h.seeker_username && h.seeker_username.toLowerCase() === currentUser.toLowerCase();
+    const needsConfirmation = (h.status === "accepted" || h.status === "in_progress") && h.status !== "completed";
+    return needsConfirmation && (
+      (isProviderForH && !h.provider_confirmed) ||
+      (isSeekerForH && !h.seeker_confirmed)
+    );
+  });
   
-  const isProvider = activeHandshake && activeHandshake.provider_username && currentUser &&
-    activeHandshake.provider_username.toLowerCase() === currentUser.toLowerCase();
+  const isProvider = isOwner; // Owner is always the provider
   
   // Debug logging (remove in production)
   if (process.env.NODE_ENV === 'development') {
@@ -622,15 +627,6 @@ function OfferDetail() {
           <div className="flex justify-between items-start mb-4">
             <h1 className="text-4xl font-bold text-amber-700">{offer.title}</h1>
             <div className="flex gap-2 items-center">
-              {/* Confirm Completion Button - Top Right */}
-              {canConfirmCompletion && (
-                <button
-                  onClick={() => handleConfirmCompletion(activeHandshake.id, isProvider)}
-                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm font-medium transition-colors"
-                >
-                  Confirm Completion
-                </button>
-              )}
               {isOwner && (
                 <>
                   <button
@@ -678,6 +674,18 @@ function OfferDetail() {
                 {offer.status === "open" ? "Open" : offer.status === "in_progress" ? "In Progress" : offer.status}
               </span>
             </p>
+            {offer.max_participants && offer.max_participants > 1 && (
+              <p className="text-gray-600 mb-2">
+                <span className="font-semibold">Participants:</span>{" "}
+                {offer.accepted_participant_count || 0} / {offer.max_participants} 
+                {offer.remaining_slots !== undefined && offer.remaining_slots > 0 && (
+                  <span className="text-green-600 ml-2">({offer.remaining_slots} slots remaining)</span>
+                )}
+                {offer.remaining_slots === 0 && (
+                  <span className="text-red-600 ml-2">(Full)</span>
+                )}
+              </p>
+            )}
             {offer.created_at && (
               <p className="text-gray-500 text-sm">
                 Created: {new Date(offer.created_at).toLocaleDateString()}
@@ -736,7 +744,15 @@ function OfferDetail() {
               <div>
                 <h3 className="font-semibold text-amber-700 mb-1">Location</h3>
                 <p className="text-gray-700">
-                  {offer.latitude.toFixed(4)}, {offer.longitude.toFixed(4)}
+                  {offer.latitude.toFixed(6)}, {offer.longitude.toFixed(6)}
+                  {offer.fuzzy_lat && offer.fuzzy_lng && (
+                    <span className="text-xs text-gray-500 block mt-1">
+                      (Displayed on map with privacy offset: {offer.fuzzy_lat.toFixed(6)}, {offer.fuzzy_lng.toFixed(6)})
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Note: Your exact location is stored, but shown on maps with a 100-200m offset for privacy.
                 </p>
               </div>
             )}
@@ -745,159 +761,126 @@ function OfferDetail() {
           {/* Handshake Section */}
           <div className="border-t pt-6 mt-6">
             <h2 className="text-2xl font-semibold text-amber-700 mb-4">
-              Handshake Status
+              {offer.max_participants > 1 ? "Handshakes" : "Handshake Status"}
             </h2>
 
-            {activeHandshake ? (
-              <div className="bg-amber-50 p-4 rounded-lg mb-4">
-                <p className="font-semibold mb-2">
-                  Active Handshake ({activeHandshake.status})
-                </p>
-                <p className="text-sm text-gray-600 mb-2">
-                  Provider:{" "}
-                  {activeHandshake.provider ? (
-                    <span
-                      className="text-amber-700 hover:text-amber-900 cursor-pointer underline font-semibold"
-                      onClick={() => navigate(`/profile/${activeHandshake.provider}`)}
-                    >
-                      {activeHandshake.provider_username || "Anonymous"}
-                    </span>
-                  ) : (
-                    activeHandshake.provider_username || "Anonymous"
-                  )}
-                </p>
-                <p className="text-sm text-gray-600 mb-2">
-                  Seeker:{" "}
-                  {activeHandshake.seeker ? (
-                    <span
-                      className="text-amber-700 hover:text-amber-900 cursor-pointer underline font-semibold"
-                      onClick={() => navigate(`/profile/${activeHandshake.seeker}`)}
-                    >
-                      {activeHandshake.seeker_username || "Anonymous"}
-                    </span>
-                  ) : (
-                    activeHandshake.seeker_username || "Anonymous"
-                  )}
-                </p>
-                <p className="text-sm text-gray-600 mb-2">
-                  Hours: {activeHandshake.hours}
-                </p>
-                
-                {/* Confirmation Status */}
-                {(activeHandshake.status === "accepted" || activeHandshake.status === "in_progress") && (
-                  <div className="mb-3 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-700">
-                        <strong>Provider:</strong>{" "}
-                        {activeHandshake.provider_confirmed ? (
-                          <span className="text-green-600">✓ Confirmed</span>
-                        ) : (
-                          <span className="text-gray-500">Pending</span>
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-700">
-                        <strong>Seeker:</strong>{" "}
-                        {activeHandshake.seeker_confirmed ? (
-                          <span className="text-green-600">✓ Confirmed</span>
-                        ) : (
-                          <span className="text-gray-500">Pending</span>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Show accept/decline buttons for owner when handshake is proposed */}
-                {isOwner && activeHandshake.status === "proposed" && (
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      onClick={() => handleAcceptHandshake(activeHandshake.id)}
-                      className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                    >
-                      Accept Handshake
-                    </button>
-                    <button
-                      onClick={() => handleDeclineHandshake(activeHandshake.id)}
-                      className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-                    >
-                      Decline Handshake
-                    </button>
-                  </div>
-                )}
-
-                {/* Waiting message if user confirmed but partner hasn't */}
-                {(activeHandshake.status === "accepted" || activeHandshake.status === "in_progress") && 
-                 activeHandshake.status !== "completed" && (() => {
-                  const isProvider = activeHandshake.provider_username && currentUser &&
-                    activeHandshake.provider_username.toLowerCase() === currentUser.toLowerCase();
-                  const isSeeker = activeHandshake.seeker_username && currentUser &&
-                    activeHandshake.seeker_username.toLowerCase() === currentUser.toLowerCase();
+            {allHandshakes.length > 0 ? (
+              <div className="space-y-4 mb-4">
+                {allHandshakes.map((handshake) => {
+                  const isProviderForThis = handshake.provider_username && currentUser &&
+                    handshake.provider_username.toLowerCase() === currentUser.toLowerCase();
+                  const isSeekerForThis = handshake.seeker_username && currentUser &&
+                    handshake.seeker_username.toLowerCase() === currentUser.toLowerCase();
                   
-                  if ((isProvider && activeHandshake.provider_confirmed && !activeHandshake.seeker_confirmed) ||
-                      (isSeeker && activeHandshake.seeker_confirmed && !activeHandshake.provider_confirmed)) {
-                    return (
-                      <p className="text-sm text-amber-600 mt-2 font-medium">
-                        ⏳ Waiting for partner to confirm...
+                  return (
+                    <div key={handshake.id} className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                      <p className="font-semibold mb-2">
+                        Handshake with {handshake.seeker_username} ({handshake.status})
                       </p>
-                    );
-                  }
-                  return null;
-                })()}
-
-                {/* Completed Status */}
-                {activeHandshake.status === "completed" && (
-                  <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
-                    <p className="text-sm text-green-700 font-medium mb-3">
-                      ✓ Service Completed! Beellars have been transferred.
-                    </p>
-                    {/* Rating Section */}
-                    {currentUser && (() => {
-                      const isProvider = activeHandshake.provider_username && 
-                        activeHandshake.provider_username.toLowerCase() === currentUser.toLowerCase();
-                      const partnerName = isProvider 
-                        ? activeHandshake.seeker_username 
-                        : activeHandshake.provider_username;
-                      
-                      return ratingStatus?.has_rated ? (
-                        <p className="text-sm text-amber-600 font-medium">
-                          ✓ Rating submitted
-                        </p>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setPartnerName(partnerName);
-                            setRatingModalOpen(true);
-                          }}
-                          className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded text-sm font-medium transition-colors"
+                      <p className="text-sm text-gray-600 mb-2">
+                        Participant:{" "}
+                        <span
+                          className="text-amber-700 hover:text-amber-900 cursor-pointer underline font-semibold"
+                          onClick={() => navigate(`/profile/${handshake.seeker}`)}
                         >
-                          Rate {partnerName}
-                        </button>
-                      );
-                    })()}
-                  </div>
-                )}
+                          {handshake.seeker_username || "Anonymous"}
+                        </span>
+                      </p>
+                      <p className="text-sm text-gray-600 mb-2">
+                        Hours: {handshake.hours}
+                      </p>
+                      
+                      {/* Confirmation Status */}
+                      {(handshake.status === "accepted" || handshake.status === "in_progress") && (
+                        <div className="mb-3 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-700">
+                              <strong>You (Owner):</strong>{" "}
+                              {handshake.provider_confirmed ? (
+                                <span className="text-green-600">✓ Confirmed</span>
+                              ) : (
+                                <span className="text-gray-500">Pending</span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-700">
+                              <strong>{handshake.seeker_username}:</strong>{" "}
+                              {handshake.seeker_confirmed ? (
+                                <span className="text-green-600">✓ Confirmed</span>
+                              ) : (
+                                <span className="text-gray-500">Pending</span>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      )}
 
-                {/* Show chat button only for owner or accepted partner */}
-                {activeHandshake.status !== "proposed" && activeHandshake.status !== "completed" && (
-                  (isOwner || 
-                   (activeHandshake.seeker_username && currentUser && 
-                    activeHandshake.seeker_username.toLowerCase() === currentUser.toLowerCase()) ||
-                   (activeHandshake.provider_username && currentUser &&
-                    activeHandshake.provider_username.toLowerCase() === currentUser.toLowerCase())
-                  ) && (
-                    <button
-                      onClick={() => setShowChat(!showChat)}
-                      className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                    >
-                      {showChat ? "Hide Chat" : "Open Chat"}
-                    </button>
-                  )
-                )}
+                      {/* Show accept/decline buttons for owner when handshake is proposed */}
+                      {isOwner && handshake.status === "proposed" && (
+                        <div className="flex gap-2 mt-4">
+                          <button
+                            onClick={() => handleAcceptHandshake(handshake.id)}
+                            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                          >
+                            Accept Handshake
+                          </button>
+                          <button
+                            onClick={() => handleDeclineHandshake(handshake.id)}
+                            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                          >
+                            Decline Handshake
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Show confirm completion button for owner (per handshake) */}
+                      {isOwner && (handshake.status === "accepted" || handshake.status === "in_progress") && 
+                       !handshake.provider_confirmed && (
+                        <button
+                          onClick={() => handleConfirmCompletion(handshake.id, true)}
+                          className="mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm font-medium"
+                        >
+                          Confirm Completion with {handshake.seeker_username}
+                        </button>
+                      )}
+                      
+                      {/* Participant's view: Show confirm completion button */}
+                      {isSeekerForThis && (handshake.status === "accepted" || handshake.status === "in_progress") && 
+                       !handshake.seeker_confirmed && (
+                        <button
+                          onClick={() => handleConfirmCompletion(handshake.id, false)}
+                          className="mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm font-medium"
+                        >
+                          Confirm Completion
+                        </button>
+                      )}
+
+                      {/* Waiting message */}
+                      {(handshake.status === "accepted" || handshake.status === "in_progress") && 
+                       handshake.status !== "completed" && (
+                        (isOwner && handshake.provider_confirmed && !handshake.seeker_confirmed) ||
+                        (isSeekerForThis && handshake.seeker_confirmed && !handshake.provider_confirmed)
+                      ) && (
+                        <p className="text-sm text-amber-600 mt-2 font-medium">
+                          ⏳ Waiting for partner to confirm...
+                        </p>
+                      )}
+
+                      {/* Completed Status */}
+                      {handshake.status === "completed" && (
+                        <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                          <p className="text-sm text-green-700 font-medium">
+                            ✓ Service Completed! Beellars transferred.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
-              <p className="text-gray-600 mb-4">No active handshake</p>
+              <p className="text-gray-600 mb-4">No active handshakes</p>
             )}
 
             {canSendHandshake && (
@@ -907,6 +890,11 @@ function OfferDetail() {
               >
                 Send Handshake Request
               </button>
+            )}
+            {!canSendHandshake && offer.remaining_slots === 0 && !isOwner && (
+              <p className="text-red-600 mb-4">
+                This offer has reached its maximum number of participants.
+              </p>
             )}
 
             {message && (

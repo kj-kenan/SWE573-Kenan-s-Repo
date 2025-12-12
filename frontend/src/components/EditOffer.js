@@ -12,6 +12,7 @@ function EditOffer() {
     duration: "",
     latitude: "",
     longitude: "",
+    max_participants: 1,
   });
 
   const [selectedTags, setSelectedTags] = useState([]);
@@ -52,6 +53,7 @@ function EditOffer() {
           duration: data.duration || "",
           latitude: data.latitude ? data.latitude.toString() : "",
           longitude: data.longitude ? data.longitude.toString() : "",
+          max_participants: data.max_participants || 1,
         });
 
         // Parse tags
@@ -223,6 +225,25 @@ function EditOffer() {
               className="block w-full mb-3 p-3 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
 
+            {/* Maximum Participants */}
+            <div className="mb-3">
+              <label className="block text-sm font-semibold text-amber-700 mb-2">
+                Maximum Participants
+              </label>
+              <input
+                type="number"
+                name="max_participants"
+                min="1"
+                value={formData.max_participants}
+                onChange={handleChange}
+                required
+                className="block w-full p-3 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+              <p className="text-xs text-gray-600 mt-1">
+                How many people can participate in this offer? (Cannot be reduced below current participant count)
+              </p>
+            </div>
+
             {/* Available Dates and Times */}
             <div className="mb-4">
               <label className="block text-sm font-semibold text-amber-700 mb-2">
@@ -340,4 +361,6 @@ function EditOffer() {
 }
 
 export default EditOffer;
+
+
 

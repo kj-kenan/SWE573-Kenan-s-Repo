@@ -73,9 +73,9 @@ class MessageAdmin(admin.ModelAdmin):
 
 @admin.register(Rating)
 class RatingAdmin(admin.ModelAdmin):
-    list_display = ("id", "handshake", "rater", "rated_user", "rating", "created_at")
-    search_fields = ("rater__username", "rated_user__username", "comment")
-    list_filter = ("rating", "created_at")
+    list_display = ("id", "handshake", "rater", "ratee", "score", "created_at")
+    search_fields = ("rater__username", "ratee__username", "comment")
+    list_filter = ("score", "created_at")
     readonly_fields = ("created_at",)
 
 

@@ -94,3 +94,5 @@ Try registering a user right now and watch your server console - you should see 
 
 
 
+
+

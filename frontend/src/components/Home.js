@@ -57,16 +57,19 @@ function Home() {
         }
       },
       (error) => {
-        console.warn("Error getting location:", error);
-        // Fallback to default location with warning
+        // Only log non-timeout errors to avoid console spam
+        if (error.code !== 3) { // 3 = TIMEOUT
+          console.warn("Error getting location:", error);
+        }
+        // Fallback to default location silently for timeout errors
         if (mapRef.current) {
           mapRef.current.setView([41.085339, 29.045607], 15);
         }
       },
       {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
+        enableHighAccuracy: false, // Changed to false to avoid timeout issues
+        timeout: 5000, // Reduced timeout to fail faster if GPS unavailable
+        maximumAge: 60000, // Allow cached location up to 1 minute old
       }
     );
   }, []);

@@ -26,10 +26,19 @@ class Offer(models.Model):
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default="open"
     )
+    max_participants = models.PositiveIntegerField(default=1, help_text="Maximum number of participants (Offers only)")
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     def __str__(self):
         return f"Offer: {self.title}"
+    
+    def get_accepted_participant_count(self):
+        """Get count of accepted handshakes for this offer"""
+        return self.handshakes.filter(status__in=["accepted", "in_progress", "completed"]).count()
+    
+    def get_remaining_slots(self):
+        """Get remaining participant slots"""
+        return max(0, self.max_participants - self.get_accepted_participant_count())
 
 
 class Request(models.Model):
@@ -79,15 +88,15 @@ class UserProfile(models.Model):
     @property
     def average_rating(self):
         """Calculate average rating from all received ratings"""
-        ratings = Rating.objects.filter(rated_user=self.user)
+        ratings = Rating.objects.filter(ratee=self.user)
         if ratings.exists():
-            return round(ratings.aggregate(models.Avg("rating"))["rating__avg"] or 0, 2)
+            return round(ratings.aggregate(models.Avg("score"))["score__avg"] or 0, 2)
         return 0.0
     
     @property
     def total_ratings(self):
         """Get total number of ratings received"""
-        return Rating.objects.filter(rated_user=self.user).count()
+        return Rating.objects.filter(ratee=self.user).count()
 
 
 class Handshake(models.Model):
@@ -119,11 +128,10 @@ class Handshake(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["provider", "seeker", "offer"], name="unique_offer_handshake"
-            )
-        ]
+        # Constraints are handled in serializer validation
+        # For offers: multiple handshakes allowed (up to max_participants)
+        # For requests: only one handshake allowed (enforced in serializer)
+        pass
 
     def clean(self):
         if not (self.offer or self.request):

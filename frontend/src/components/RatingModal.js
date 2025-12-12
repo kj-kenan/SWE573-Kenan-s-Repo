@@ -203,3 +203,5 @@ function RatingModal({ handshake, partnerName, onClose, onSubmit, isOpen }) {
 
 export default RatingModal;
 
+
+

@@ -161,6 +161,8 @@ class OfferSerializer(serializers.ModelSerializer):
     active_handshake = serializers.SerializerMethodField()
     fuzzy_lat = serializers.SerializerMethodField()
     fuzzy_lng = serializers.SerializerMethodField()
+    accepted_participant_count = serializers.SerializerMethodField()
+    remaining_slots = serializers.SerializerMethodField()
 
     class Meta:
         model = Offer
@@ -181,8 +183,11 @@ class OfferSerializer(serializers.ModelSerializer):
             "status",
             "created_at",
             "active_handshake",
+            "max_participants",
+            "accepted_participant_count",
+            "remaining_slots",
         ]
-        read_only_fields = ["user", "status", "created_at"]
+        read_only_fields = ["user", "status", "created_at", "accepted_participant_count", "remaining_slots"]
 
     def get_username(self, obj):
         return obj.user.username if obj.user else None
@@ -214,20 +219,50 @@ class OfferSerializer(serializers.ModelSerializer):
             owner_id=owner_id
         )
         return fuzzy_lng
+    
+    def get_accepted_participant_count(self, obj):
+        """Get count of accepted participants"""
+        return obj.get_accepted_participant_count()
+    
+    def get_remaining_slots(self, obj):
+        """Get remaining participant slots"""
+        return obj.get_remaining_slots()
+    
+    def validate_max_participants(self, value):
+        """Validate max_participants is at least 1"""
+        if value < 1:
+            raise serializers.ValidationError("Maximum participants must be at least 1.")
+        return value
 
     def get_active_handshake(self, obj):
-        """Return active handshake info if exists"""
-        active = obj.handshakes.filter(
+        """Return active handshake info if exists (for single participant) or list of handshakes (for multi-participant)"""
+        active_handshakes = obj.handshakes.filter(
             status__in=["proposed", "accepted", "in_progress"]
-        ).first()
-        if active:
+        )
+        
+        # For backwards compatibility, return first handshake if only one
+        # But also include participant count info
+        if active_handshakes.count() > 0:
+            handshakes_list = [
+                {
+                    "id": h.id,
+                    "status": h.status,
+                    "seeker_username": h.seeker.username,
+                    "seeker": h.seeker.id,
+                    "provider_username": h.provider.username,
+                    "provider": h.provider.id,
+                    "hours": h.hours,
+                    "created_at": h.created_at,
+                    "provider_confirmed": h.provider_confirmed,
+                    "seeker_confirmed": h.seeker_confirmed,
+                }
+                for h in active_handshakes
+            ]
+            # Return first handshake for backwards compatibility, plus full list
             return {
-                "id": active.id,
-                "status": active.status,
-                "seeker_username": active.seeker.username,
-                "provider_username": active.provider.username,
-                "hours": active.hours,
-                "created_at": active.created_at,
+                **handshakes_list[0],
+                "all_handshakes": handshakes_list,
+                "participant_count": active_handshakes.filter(status__in=["accepted", "in_progress", "completed"]).count(),
             }
         return None
 
@@ -380,14 +415,22 @@ class HandshakeSerializer(serializers.ModelSerializer):
                     "The offer does not have an owner. Cannot create handshake."
                 )
             provider = offer.user
-            # Check for existing active handshakes on this offer
-            active_handshakes = Handshake.objects.filter(
+            
+            # Check if user already has a handshake with this offer (prevent duplicates)
+            existing_handshake = Handshake.objects.filter(
                 offer=offer,
-                status__in=["proposed", "accepted", "in_progress"]
-            ).exclude(id=None)
-            if active_handshakes.exists():
+                seeker=user
+            ).exclude(status="declined").first()
+            if existing_handshake:
                 raise serializers.ValidationError(
-                    "This offer already has an active handshake. Please wait for it to complete or be declined."
+                    "You already have a handshake with this offer."
+                )
+            
+            # For offers: check if max_participants is reached
+            accepted_count = offer.get_accepted_participant_count()
+            if accepted_count >= offer.max_participants:
+                raise serializers.ValidationError(
+                    f"This offer has reached its maximum number of participants ({offer.max_participants})."
                 )
         elif request_obj:
             # Ensure we have the full request object with user
@@ -396,14 +439,14 @@ class HandshakeSerializer(serializers.ModelSerializer):
                     "The request does not have an owner. Cannot create handshake."
                 )
             provider = request_obj.user
-            # Check for existing active handshakes on this request
+            # Requests must remain 1-to-1: only one active handshake allowed
             active_handshakes = Handshake.objects.filter(
                 request=request_obj,
                 status__in=["proposed", "accepted", "in_progress"]
             ).exclude(id=None)
             if active_handshakes.exists():
                 raise serializers.ValidationError(
-                    "This request already has an active handshake. Please wait for it to complete or be declined."
+                    "This request already has an active handshake. Requests can only have one participant."
                 )
         else:
             raise serializers.ValidationError("Either offer or request must be provided.")

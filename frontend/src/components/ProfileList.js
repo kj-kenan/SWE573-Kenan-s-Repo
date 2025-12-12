@@ -50,10 +50,20 @@ function ProfileList() {
       fetch(`${API_BASE_URL}/api/profiles/me/`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-        .then((res) => res.json())
+        .then(async (res) => {
+          if (!res.ok) {
+            // Don't throw - just set admin to false if request fails
+            return null;
+          }
+          return res.json();
+        })
         .then((ownProfile) => {
           // Check if the viewer is an admin (is_admin field from their own profile)
-          setIsViewerAdmin(ownProfile.is_admin === true);
+          if (ownProfile) {
+            setIsViewerAdmin(ownProfile.is_admin === true);
+          } else {
+            setIsViewerAdmin(false);
+          }
         })
         .catch((err) => {
           console.error("Error checking admin status:", err);
@@ -87,7 +97,18 @@ function ProfileList() {
 
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      const profileData = await (await fetch(profileUrl, { headers })).json();
+      const profileResponse = await fetch(profileUrl, { headers });
+      if (!profileResponse.ok) {
+        // Check if response is JSON or HTML
+        const contentType = profileResponse.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await profileResponse.json();
+          throw new Error(errorData.error || errorData.detail || `Failed to load profile: ${profileResponse.status}`);
+        } else {
+          throw new Error(`Failed to load profile: ${profileResponse.status} ${profileResponse.statusText}`);
+        }
+      }
+      const profileData = await profileResponse.json();
       setProfile(profileData);
       // If no userId, we're viewing own profile (via /profile route)
       // Also check if username matches or if we successfully loaded /api/profiles/me/
@@ -223,8 +244,13 @@ function ProfileList() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update profile");
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || errorData.detail || "Failed to update profile");
+        } else {
+          throw new Error(`Failed to update profile: ${response.status} ${response.statusText}`);
+        }
       }
 
       const updatedProfile = await response.json();
@@ -353,13 +379,6 @@ function ProfileList() {
                   </span>
                 )}
               </div>
-              <p className="text-gray-600 mb-2">{profile.email}</p>
-              {/* Admin-only: Email verification status */}
-              {isViewerAdmin && profile.email_verified !== null && profile.email_verified !== undefined && (
-                <p className={`text-sm mb-2 ${profile.email_verified ? 'text-green-600' : 'text-red-600'}`}>
-                  {profile.email_verified ? '✓ Email Verified' : '✗ Email Not Verified'}
-                </p>
-              )}
               {profile.location && (
                 <p className="text-gray-500 text-sm mb-4">📍 {profile.location}</p>
               )}

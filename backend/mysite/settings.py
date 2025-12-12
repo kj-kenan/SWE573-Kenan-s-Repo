@@ -64,16 +64,28 @@ TEMPLATES = [
 ]
 
 
-# Database configuration - uses SQLite locally if DATABASE_URL not set
-DATABASE_URL = os.environ.get('DATABASE_URL')
-if DATABASE_URL:
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=DATABASE_URL,
-            conn_max_age=600,
-            ssl_require=os.getenv('DATABASE_SSL_REQUIRE', 'False').lower() == 'true'
-        )
-    }
+# Database configuration - uses SQLite locally if DATABASE_URL not set or FORCE_SQLITE is True
+FORCE_SQLITE = os.getenv('FORCE_SQLITE', 'False').lower() == 'true'
+DATABASE_URL = os.environ.get('DATABASE_URL') if not FORCE_SQLITE else None
+
+if DATABASE_URL and not FORCE_SQLITE:
+    try:
+        DATABASES = {
+            'default': dj_database_url.config(
+                default=DATABASE_URL,
+                conn_max_age=600,
+                ssl_require=os.getenv('DATABASE_SSL_REQUIRE', 'False').lower() == 'true'
+            )
+        }
+    except Exception as e:
+        print(f"Warning: Failed to connect to remote database: {e}")
+        print("Falling back to SQLite for local development.")
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
 else:
     # Local development - use SQLite
     DATABASES = {
