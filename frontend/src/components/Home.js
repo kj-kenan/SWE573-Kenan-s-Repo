@@ -299,12 +299,30 @@ function Home() {
             const lng = req.fuzzy_lng !== undefined ? req.fuzzy_lng : req.longitude;
             
             if (lat && lng) {
+              const popupContent = `
+                <b>${req.title}</b><br>
+                ${req.description || ""}<br><br>
+                <button id="view-request-${req.id}" style="${buttonStyle}">
+                  View Details
+                </button>
+              `;
+
               const marker = L.marker([lat, lng], {
                 icon: needMarker,
                 opacity: 0.57,
               })
                 .addTo(mapRef.current)
-                .bindPopup(`<b>${req.title}</b><br>${req.description || ""}`);
+                .bindPopup(popupContent);
+
+              marker.on("popupopen", () => {
+                const btn = document.getElementById(`view-request-${req.id}`);
+                if (btn) btn.onclick = () => navigate(`/requests/${req.id}`);
+              });
+
+              marker.on("popupclose", () => {
+                const btn = document.getElementById(`view-request-${req.id}`);
+                if (btn) btn.onclick = null;
+              });
 
               markersRef.current.push(marker);
             }
@@ -312,7 +330,7 @@ function Home() {
         }
       })
       .catch((err) => console.error("Request fetch error:", err));
-  }, [API_BASE_URL, appliedFilters, userLocation, sendHandshake]);
+  }, [API_BASE_URL, appliedFilters, userLocation, sendHandshake, navigate]);
 
   // Handle filter changes - only called when Apply button is clicked
   const handleFilterChange = useCallback((newFilters) => {
