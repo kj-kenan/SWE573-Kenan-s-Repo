@@ -787,7 +787,7 @@ function OfferDetail() {
                         <div className="mb-3 space-y-1">
                           <div className="flex items-center gap-2">
                             <span className="text-sm text-gray-700">
-                              <strong>You (Owner):</strong>{" "}
+                              <strong>{handshake.provider_username || offer.username}:</strong>{" "}
                               {handshake.provider_confirmed ? (
                                 <span className="text-green-600">✓ Confirmed</span>
                               ) : (
@@ -863,7 +863,7 @@ function OfferDetail() {
                       {handshake.status === "completed" && (
                         <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
                           <p className="text-sm text-green-700 font-medium">
-                            ✓ Service Completed! Beellars transferred.
+                            Service completed! Beellars have been transferred.
                           </p>
                         </div>
                       )}
@@ -884,9 +884,7 @@ function OfferDetail() {
               </button>
             )}
             {!canSendHandshake && offer.remaining_slots === 0 && !isOwner && (
-              <p className="text-red-600 mb-4">
-                This offer has reached its maximum number of participants.
-              </p>
+              <></>
             )}
 
             {message && (
