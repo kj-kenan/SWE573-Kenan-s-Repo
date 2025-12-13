@@ -253,8 +253,8 @@ function Home() {
               const popupContent = `
                 <b>${offer.title}</b><br>
                 ${offer.description || ""}<br><br>
-                <button id="handshake-${offer.id}" style="${buttonStyle}">
-                  Send Handshake
+                <button id="view-offer-${offer.id}" style="${buttonStyle}">
+                  View Details
                 </button>
               `;
 
@@ -266,12 +266,12 @@ function Home() {
                 .bindPopup(popupContent);
 
               marker.on("popupopen", () => {
-                const btn = document.getElementById(`handshake-${offer.id}`);
-                if (btn) btn.onclick = () => sendHandshake(offer.id);
+                const btn = document.getElementById(`view-offer-${offer.id}`);
+                if (btn) btn.onclick = () => navigate(`/offers/${offer.id}`);
               });
 
               marker.on("popupclose", () => {
-                const btn = document.getElementById(`handshake-${offer.id}`);
+                const btn = document.getElementById(`view-offer-${offer.id}`);
                 if (btn) btn.onclick = null;
               });
 
@@ -330,7 +330,7 @@ function Home() {
         }
       })
       .catch((err) => console.error("Request fetch error:", err));
-  }, [API_BASE_URL, appliedFilters, userLocation, sendHandshake, navigate]);
+  }, [API_BASE_URL, appliedFilters, userLocation, navigate]);
 
   // Handle filter changes - only called when Apply button is clicked
   const handleFilterChange = useCallback((newFilters) => {
