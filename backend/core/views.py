@@ -1479,8 +1479,8 @@ def badges_list(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-        serializer = BadgeSerializer(badges, many=True)
-        return Response(serializer.data)
+    serializer = BadgeSerializer(badges, many=True)
+    return Response(serializer.data)
 
 
 @api_view(["POST"])
