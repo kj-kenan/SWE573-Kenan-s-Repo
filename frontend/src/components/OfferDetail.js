@@ -243,9 +243,12 @@ function OfferDetail() {
 
     const token = localStorage.getItem("access");
     if (!token) {
+      console.error("No access token found in localStorage");
       setMessage("Please log in to ask a question.");
       return;
     }
+    
+    console.log("Token found, current user:", currentUser);
 
     try {
       console.log("Posting question to:", `${API_BASE_URL}/api/questions/`);
