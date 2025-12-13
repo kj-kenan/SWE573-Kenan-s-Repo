@@ -563,7 +563,18 @@ function OfferDetail() {
   }
 
   // Check if user is logged in (has token, even if username not yet loaded)
-  const isLoggedIn = Boolean(localStorage.getItem("access"));
+  const token = localStorage.getItem("access");
+  const isLoggedIn = Boolean(token);
+  
+  // Debug: Log authentication state
+  console.log('🔍 OfferDetail Auth Debug:', {
+    hasToken: !!token,
+    tokenLength: token?.length,
+    isLoggedIn,
+    currentUser,
+    offerUsername: offer?.username,
+    localStorageKeys: Object.keys(localStorage),
+  });
   
   // Check if current user is the owner - handle null/undefined cases
   // Compare usernames (case-insensitive for safety, but both must be strings)
