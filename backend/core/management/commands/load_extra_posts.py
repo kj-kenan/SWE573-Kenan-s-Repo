@@ -247,3 +247,4 @@ class Command(BaseCommand):
         self.stdout.write("\n📅 These posts include specific available time slots")
         self.stdout.write("\n" + "="*60 + "\n")
 
+

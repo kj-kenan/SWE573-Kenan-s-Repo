@@ -10,7 +10,14 @@ from .models import UserProfile
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Custom token serializer that checks email verification."""
+    """Custom token serializer that checks email verification and adds username to token."""
+    
+    @classmethod
+    def get_token(cls, user):
+        """Add username to the token payload"""
+        token = super().get_token(user)
+        token['username'] = user.username
+        return token
     
     def validate(self, attrs):
         # First, get the user and validate credentials

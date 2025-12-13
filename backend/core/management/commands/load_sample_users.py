@@ -199,3 +199,4 @@ class Command(BaseCommand):
         self.stdout.write(f"💰 All users start with 3 Beellars")
         self.stdout.write("\n" + "="*60 + "\n")
 
+

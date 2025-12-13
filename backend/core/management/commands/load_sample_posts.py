@@ -633,3 +633,4 @@ class Command(BaseCommand):
         self.stdout.write("\n🗺️  All posts are located around Beşiktaş, Kadıköy, Sarıyer, and Üsküdar")
         self.stdout.write("\n" + "="*60 + "\n")
 
+
