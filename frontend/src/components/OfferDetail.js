@@ -520,10 +520,28 @@ function OfferDetail() {
       if (response.ok) {
         // Update offer state with new handshake data if available
         if (data.handshake) {
-          setOffer((prevOffer) => ({
-            ...prevOffer,
-            active_handshake: data.handshake,
-          }));
+          setOffer((prevOffer) => {
+            // For multi-participant offers, update the specific handshake in all_handshakes
+            if (prevOffer.active_handshake?.all_handshakes) {
+              const updatedAllHandshakes = prevOffer.active_handshake.all_handshakes.map(h =>
+                h.id === data.handshake.id ? data.handshake : h
+              );
+              return {
+                ...prevOffer,
+                active_handshake: {
+                  ...prevOffer.active_handshake,
+                  all_handshakes: updatedAllHandshakes,
+                  // Update the main handshake if it's the one being confirmed
+                  ...(prevOffer.active_handshake.id === data.handshake.id ? data.handshake : {}),
+                },
+              };
+            }
+            // For single participant, just replace
+            return {
+              ...prevOffer,
+              active_handshake: data.handshake,
+            };
+          });
         } else {
           // Reload the offer to get updated data
           window.location.reload();
