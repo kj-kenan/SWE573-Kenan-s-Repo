@@ -394,9 +394,12 @@ function ProfileList() {
                     ({profile.total_ratings || 0} ratings)
                   </span>
                 </div>
-                <div className="text-amber-600 font-semibold">
-                  💰 {profile.timebank_balance || 0} Beellars
-                </div>
+                {/* Only show balance for own profile */}
+                {isOwner && profile.timebank_balance !== undefined && (
+                  <div className="text-amber-600 font-semibold">
+                    💰 {profile.timebank_balance || 0} Beellars
+                  </div>
+                )}
               </div>
 
               {/* Edit/Delete buttons for own profile */}
