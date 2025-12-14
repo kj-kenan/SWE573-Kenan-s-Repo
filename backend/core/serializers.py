@@ -237,7 +237,7 @@ class OfferSerializer(serializers.ModelSerializer):
     def get_active_handshake(self, obj):
         """Return active handshake info if exists (for single participant) or list of handshakes (for multi-participant)"""
         active_handshakes = obj.handshakes.filter(
-            status__in=["proposed", "accepted", "in_progress"]
+            status__in=["proposed", "accepted", "in_progress", "completed"]
         )
         
         # For backwards compatibility, return first handshake if only one
