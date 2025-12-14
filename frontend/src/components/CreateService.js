@@ -301,7 +301,7 @@ function CreateService() {
     }
 
     // Check user balance for requests
-    if (serviceType === "request" && userBalance === 0) {
+    if (serviceType === "request" && userBalance !== null && userBalance <= 0) {
       setIsError(true);
       setMessage("❌ You need at least 1 Beellar to post a request. Provide services to earn Beellars!");
       return;
@@ -395,6 +395,15 @@ function CreateService() {
               Request
             </button>
           </div>
+
+          {/* Warning for users with 0 beellars trying to post requests */}
+          {serviceType === "request" && userBalance !== null && userBalance <= 0 && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700 font-medium">
+                ⚠️ You need at least 1 Beellar to post a request. Post an offer or provide services to earn Beellars!
+              </p>
+            </div>
+          )}
 
           {/* FORM */}
           <form onSubmit={handleSubmit}>
@@ -614,7 +623,12 @@ function CreateService() {
 
             <button
               type="submit"
-              className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded font-semibold shadow"
+              disabled={serviceType === "request" && userBalance !== null && userBalance <= 0}
+              className={`w-full py-3 rounded font-semibold shadow transition ${
+                serviceType === "request" && userBalance !== null && userBalance <= 0
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-amber-500 hover:bg-amber-600 text-white'
+              }`}
             >
               Post {serviceType === "offer" ? "Offer" : "Request"}
             </button>

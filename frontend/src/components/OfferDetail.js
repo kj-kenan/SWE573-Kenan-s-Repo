@@ -151,7 +151,7 @@ function OfferDetail() {
     }
 
     // Check user balance first
-    if (userBalance === 0) {
+    if (userBalance !== null && userBalance <= 0) {
       setMessage("❌ You need at least 1 Beellar to send a handshake request. Provide services to earn Beellars!");
       return;
     }
@@ -929,12 +929,24 @@ function OfferDetail() {
             )}
 
             {canSendHandshake && (
-              <button
-                onClick={handleSendHandshake}
-                className="px-6 py-3 bg-amber-500 text-white rounded-lg font-semibold hover:bg-amber-600 transition"
-              >
-                Send Handshake Request
-              </button>
+              <>
+                <button
+                  onClick={handleSendHandshake}
+                  disabled={userBalance !== null && userBalance <= 0}
+                  className={`px-6 py-3 rounded-lg font-semibold transition ${
+                    userBalance !== null && userBalance <= 0
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-amber-500 text-white hover:bg-amber-600'
+                  }`}
+                >
+                  Send Handshake Request
+                </button>
+                {userBalance !== null && userBalance <= 0 && (
+                  <p className="mt-2 text-sm text-red-600 font-medium">
+                    ⚠️ You need at least 1 Beellar to send handshake requests
+                  </p>
+                )}
+              </>
             )}
             {!canSendHandshake && offer.remaining_slots === 0 && !isOwner && (
               <></>
