@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -58,11 +58,29 @@ function CreateService() {
   const [locationWatchId, setLocationWatchId] = useState(null);
   const bestPositionRef = useRef(null);
   const bestAccuracyRef = useRef(Infinity);
+  const [userBalance, setUserBalance] = useState(null);
 
   // ✅ environment değişkeni + fallback
   const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL ||
     "https://swe573-kenan-s-repo.onrender.com";
+
+  // Fetch user balance on mount
+  useEffect(() => {
+    const token = localStorage.getItem("access");
+    if (token) {
+      fetch(`${API_BASE_URL}/api/profiles/me/`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+        .then((res) => res.json())
+        .then((profile) => {
+          setUserBalance(profile.timebank_balance || 0);
+        })
+        .catch((err) => console.error("Error fetching user balance:", err));
+    }
+  }, [API_BASE_URL]);
 
   const handleChange = (e) => {
     setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
@@ -282,6 +300,13 @@ function CreateService() {
       return;
     }
 
+    // Check user balance for requests
+    if (serviceType === "request" && userBalance === 0) {
+      setIsError(true);
+      setMessage("❌ You need at least 1 Beellar to post a request. Provide services to earn Beellars!");
+      return;
+    }
+
     // ✅ localhost yerine env tabanlı endpoint
     const endpoint =
       serviceType === "offer"
@@ -380,6 +405,8 @@ function CreateService() {
               value={formData.title}
               onChange={handleChange}
               required
+              onInvalid={(e) => e.target.setCustomValidity('Please fill in the title field')}
+              onInput={(e) => e.target.setCustomValidity('')}
               className="block w-full mb-3 p-3 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
 
@@ -389,6 +416,8 @@ function CreateService() {
               value={formData.description}
               onChange={handleChange}
               required
+              onInvalid={(e) => e.target.setCustomValidity('Please fill in the description field')}
+              onInput={(e) => e.target.setCustomValidity('')}
               rows={4}
               className="block w-full mb-3 p-3 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
@@ -400,6 +429,8 @@ function CreateService() {
               value={formData.duration}
               onChange={handleChange}
               required
+              onInvalid={(e) => e.target.setCustomValidity('Please fill in the duration field')}
+              onInput={(e) => e.target.setCustomValidity('')}
               className="block w-full mb-3 p-3 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
 
@@ -416,6 +447,8 @@ function CreateService() {
                   value={formData.max_participants}
                   onChange={handleChange}
                   required
+                  onInvalid={(e) => e.target.setCustomValidity('Please fill in the maximum participants field')}
+                  onInput={(e) => e.target.setCustomValidity('')}
                   className="block w-full p-3 border rounded focus:outline-none focus:ring-2 focus:ring-amber-400"
                 />
                 <p className="text-xs text-gray-600 mt-1">

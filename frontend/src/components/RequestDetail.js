@@ -15,6 +15,7 @@ function RequestDetail() {
   const [newMessage, setNewMessage] = useState("");
   const [showChat, setShowChat] = useState(false);
   const [answerInputs, setAnswerInputs] = useState({}); // Store answer inputs by question ID
+  const [userBalance, setUserBalance] = useState(null);
 
   const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL ||
@@ -42,6 +43,20 @@ function RequestDetail() {
       }
     } else {
       setCurrentUser(null);
+    }
+
+    // Fetch user balance
+    if (token) {
+      fetch(`${API_BASE_URL}/api/profiles/me/`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+        .then((res) => res.json())
+        .then((profile) => {
+          setUserBalance(profile.timebank_balance || 0);
+        })
+        .catch((err) => console.error("Error fetching user balance:", err));
     }
 
     // Fetch request details
@@ -82,6 +97,12 @@ function RequestDetail() {
     const token = localStorage.getItem("access");
     if (!token) {
       setMessage("Please log in to send a handshake.");
+      return;
+    }
+
+    // Check user balance first
+    if (userBalance === 0) {
+      setMessage("❌ You need at least 1 Beellar to send a handshake request. Provide services to earn Beellars!");
       return;
     }
 
