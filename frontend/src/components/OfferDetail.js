@@ -630,6 +630,17 @@ function OfferDetail() {
     h.seeker_username && currentUser && h.seeker_username.toLowerCase() === currentUser.toLowerCase()
   );
   
+  // Check if user is a participant in ANY handshake (for group chat access)
+  const isParticipant = allHandshakes.some(h => 
+    (h.seeker_username && currentUser && h.seeker_username.toLowerCase() === currentUser.toLowerCase()) ||
+    (h.provider_username && currentUser && h.provider_username.toLowerCase() === currentUser.toLowerCase())
+  );
+  
+  // Check if there are any accepted/in-progress/completed handshakes (for showing chat button)
+  const hasActiveHandshakes = allHandshakes.some(h => 
+    h.status === "accepted" || h.status === "in_progress" || h.status === "completed"
+  );
+  
   // Handshake button: only show if NOT owner, user is logged in, offer is open, and slots available
   const canSendHandshake = Boolean(
     isLoggedIn && 
@@ -963,6 +974,16 @@ function OfferDetail() {
                 {message.includes("Service Completed") ? "" : message}
               </p>
             )}
+
+            {/* Show chat button for owner or any participant with accepted/in-progress handshake */}
+            {hasActiveHandshakes && (isOwner || isParticipant) && (
+              <button
+                onClick={() => setShowChat(!showChat)}
+                className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 font-semibold"
+              >
+                {showChat ? "Hide Chat" : (offer.max_participants > 1 ? "Open Group Chat" : "Open Chat")}
+              </button>
+            )}
           </div>
 
           {/* Public Questions Section */}
@@ -1106,17 +1127,16 @@ function OfferDetail() {
             )}
           </div>
 
-          {/* Private Chat Section (after handshake accepted) - Only visible to owner or accepted partner */}
-          {showChat && activeHandshake && activeHandshake.status !== "proposed" && 
-            (isOwner || 
-             (activeHandshake.seeker_username && currentUser && 
-              activeHandshake.seeker_username.toLowerCase() === currentUser.toLowerCase()) ||
-             (activeHandshake.provider_username && currentUser &&
-              activeHandshake.provider_username.toLowerCase() === currentUser.toLowerCase())
-            ) && (
+          {/* Chat Section - Group chat for multi-participant, private for single */}
+          {showChat && hasActiveHandshakes && (isOwner || isParticipant) && (
             <div className="border-t pt-6 mt-6">
               <h2 className="text-2xl font-semibold text-amber-700 mb-4">
-                Private Chat
+                {offer.max_participants > 1 ? "Group Chat" : "Private Chat"}
+                {offer.max_participants > 1 && (
+                  <span className="text-sm font-normal text-gray-600 ml-2">
+                    (All participants can see messages)
+                  </span>
+                )}
               </h2>
 
               <div className="bg-gray-50 p-4 rounded-lg mb-4" style={{ maxHeight: "400px", overflowY: "auto" }}>
