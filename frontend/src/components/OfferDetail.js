@@ -939,11 +939,11 @@ function OfferDetail() {
                       : 'bg-amber-500 text-white hover:bg-amber-600'
                   }`}
                 >
-                  Send Handshake Request
+                  Send Handshake Request (Receive Service)
                 </button>
                 {userBalance !== null && userBalance <= 0 && (
                   <p className="mt-2 text-sm text-red-600 font-medium">
-                    ⚠️ You need at least 1 Beellar to send handshake requests
+                    ⚠️ You need at least 1 Beellar to request services
                   </p>
                 )}
               </>
