@@ -6,11 +6,12 @@ from datetime import datetime, timedelta
 
 
 class Command(BaseCommand):
-    help = 'Load 50+ realistic offers and requests around Hisarüstü and Göktürk areas'
+    help = 'Load 50+ realistic offers and requests around Maslak area'
 
-    # Center coordinates
-    HISARUSTU_CENTER = (41.165, 28.890)
-    GOKTURK_CENTER = (41.180, 28.920)
+    # Center coordinates - Maslak and surrounding neighborhoods
+    MASLAK_CENTER = (41.110, 29.020)
+    MASLAK_NORTH = (41.125, 29.025)
+    MASLAK_SOUTH = (41.095, 29.015)
 
     # Realistic offers (people needing help)
     OFFERS_DATA = [
@@ -120,8 +121,8 @@ class Command(BaseCommand):
         ("Swimming lessons for children", "Swimming instructor offering lessons for kids at local pool.", ["sports", "education", "children"], 1, 4),
     ]
 
-    def add_random_offset(self, center, max_offset=0.015):
-        """Add random offset to coordinates (roughly 1-2km radius)"""
+    def add_random_offset(self, center, max_offset=0.035):
+        """Add random offset to coordinates (roughly 2-4km radius for better spread)"""
         lat_offset = random.uniform(-max_offset, max_offset)
         lng_offset = random.uniform(-max_offset, max_offset)
         return (center[0] + lat_offset, center[1] + lng_offset)
@@ -142,8 +143,8 @@ class Command(BaseCommand):
         # Create offers
         self.stdout.write(self.style.NOTICE('Creating realistic offers...'))
         for title, description, tags, duration, slots in self.OFFERS_DATA:
-            # Randomly choose between two areas
-            center = random.choice([self.HISARUSTU_CENTER, self.GOKTURK_CENTER])
+            # Randomly choose between three areas in Maslak region for better spread
+            center = random.choice([self.MASLAK_CENTER, self.MASLAK_NORTH, self.MASLAK_SOUTH])
             latitude, longitude = self.add_random_offset(center)
             
             user = random.choice(users)
@@ -170,8 +171,8 @@ class Command(BaseCommand):
         # Create requests
         self.stdout.write(self.style.NOTICE('Creating realistic requests...'))
         for title, description, tags, duration, slots in self.REQUESTS_DATA:
-            # Randomly choose between two areas
-            center = random.choice([self.HISARUSTU_CENTER, self.GOKTURK_CENTER])
+            # Randomly choose between three areas in Maslak region for better spread
+            center = random.choice([self.MASLAK_CENTER, self.MASLAK_NORTH, self.MASLAK_SOUTH])
             latitude, longitude = self.add_random_offset(center)
             
             user = random.choice(users)
@@ -199,6 +200,6 @@ class Command(BaseCommand):
             f'   • {created_offers} offers\n'
             f'   • {created_requests} requests\n'
             f'   • Total: {created_offers + created_requests} posts\n'
-            f'\nAll posts are distributed around Hisarüstü and Göktürk areas.'
+            f'\nAll posts are distributed around Maslak area with 2-4km spread.'
         ))
 
