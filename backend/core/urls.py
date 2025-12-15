@@ -56,4 +56,6 @@ urlpatterns = [
     path("inbox/pending-handshakes/", views.inbox_pending_handshakes, name="inbox_pending_handshakes"),
     path("inbox/unread-messages/", views.inbox_unread_messages, name="inbox_unread_messages"),
     path("inbox/conversations/", views.inbox_conversations, name="inbox_conversations"),
+    # Admin utilities
+    path("admin/load-realistic-posts/", views.load_realistic_posts_admin, name="load_realistic_posts_admin"),
 ]

@@ -2079,3 +2079,40 @@ def inbox_conversations(request):
     conversations.sort(key=lambda x: x["latest_message"]["created_at"], reverse=True)
     
     return Response(conversations, status=status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# ADMIN UTILITY: Load Realistic Posts (TEMPORARY - Remove after use)
+# ---------------------------------------------------------------------------
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def load_realistic_posts_admin(request):
+    """
+    Admin-only endpoint to load realistic posts.
+    Triggers the management command via API.
+    """
+    # Check if user is superuser
+    if not request.user.is_superuser:
+        return Response(
+            {"error": "Only administrators can load sample data."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    try:
+        from django.core.management import call_command
+        from io import StringIO
+        
+        # Capture command output
+        output = StringIO()
+        call_command('load_realistic_posts', stdout=output)
+        
+        return Response({
+            "success": True,
+            "message": "Realistic posts loaded successfully!",
+            "output": output.getvalue()
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            "error": f"Failed to load posts: {str(e)}"
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
