@@ -144,19 +144,25 @@ class Command(BaseCommand):
         for title, description, tags, duration, slots in self.OFFERS_DATA:
             # Randomly choose between two areas
             center = random.choice([self.HISARUSTU_CENTER, self.GOKTURK_CENTER])
-            lat, lng = self.add_random_offset(center)
+            latitude, longitude = self.add_random_offset(center)
             
-            owner = random.choice(users)
+            user = random.choice(users)
+            
+            # Convert tags list to comma-separated string
+            tags_str = ','.join(tags) if isinstance(tags, list) else tags
+            
+            # Duration is a CharField, format as "X hours"
+            duration_str = f"{duration} hours"
             
             offer = Offer.objects.create(
-                owner=owner,
+                user=user,
                 title=title,
                 description=description,
-                tags=tags,
-                lat=lat,
-                lng=lng,
-                duration_hours=duration,
-                available_slots=slots,
+                tags=tags_str,
+                latitude=latitude,
+                longitude=longitude,
+                duration=duration_str,
+                max_participants=slots,
                 created_at=datetime.now() - timedelta(days=random.randint(1, 30))
             )
             created_offers += 1
@@ -166,19 +172,24 @@ class Command(BaseCommand):
         for title, description, tags, duration, slots in self.REQUESTS_DATA:
             # Randomly choose between two areas
             center = random.choice([self.HISARUSTU_CENTER, self.GOKTURK_CENTER])
-            lat, lng = self.add_random_offset(center)
+            latitude, longitude = self.add_random_offset(center)
             
-            owner = random.choice(users)
+            user = random.choice(users)
+            
+            # Convert tags list to comma-separated string
+            tags_str = ','.join(tags) if isinstance(tags, list) else tags
+            
+            # Duration is a CharField, format as "X hours"
+            duration_str = f"{duration} hours"
             
             request = Request.objects.create(
-                owner=owner,
+                user=user,
                 title=title,
                 description=description,
-                tags=tags,
-                lat=lat,
-                lng=lng,
-                duration_hours=duration,
-                available_slots=slots,
+                tags=tags_str,
+                latitude=latitude,
+                longitude=longitude,
+                duration=duration_str,
                 created_at=datetime.now() - timedelta(days=random.randint(1, 30))
             )
             created_requests += 1
