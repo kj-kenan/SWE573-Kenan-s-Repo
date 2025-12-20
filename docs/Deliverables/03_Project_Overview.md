@@ -1,0 +1,7 @@
+# 3. Project Overview
+
+The Hive is a community-oriented service exchange platform that enables local community members to meet through non-monetary, time-based interactions. Users can express both their needs and what they are willing to offer, discover relevant opportunities within their community, and connect through a mutual exchange model rather than financial transactions. By focusing on trust, reciprocity, and accessibility, The Hive aims to provide a structured and simple way for people to help each other using their skills, knowledge, and time.
+## 3.1 Core Problem Statement
+In everyday life, people often have needs they cannot easily fulfill and things they would like to offer to others and maybe find people for their casual needs but there is no practical way to connect the right people. Such exchanges usually depend on chance, personal networks, or awkward interactions, while most existing platforms turn them into paid services. The Hive aims to provide a simple and trusted way for people to express their needs and offers and meet through community-based exchange rather than money.
+## 3.2 Target Users
+The Hive is designed for local community members seeking non-monetary service exchange opportunities within their geographic area.
